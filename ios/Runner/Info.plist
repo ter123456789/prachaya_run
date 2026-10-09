@@ -43,6 +43,20 @@
 	</array>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>ใช้ตำแหน่ง GPS เพื่อบันทึกเส้นทาง ระยะทาง และความเร็วของกิจกรรม</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>ใช้ตำแหน่ง GPS เพื่อบันทึกกิจกรรมต่อเนื่องแม้ปิดหน้าจอ</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>เลือกรูปภาพเพื่อใส่เส้นทางและสถิติการวิ่ง</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>บันทึกรูปภาพที่มีเส้นทางและสถิติลงในคลังรูปภาพ</string>
+	<key>NSCameraUsageDescription</key>
+	<string>ถ่ายรูปเพื่อใส่เส้นทางและสถิติการวิ่ง</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>location</string>
+	</array>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
 </dict>
