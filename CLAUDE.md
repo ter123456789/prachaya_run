@@ -33,8 +33,15 @@ Rules (enforced for every feature by `test/architecture_test.dart`):
 - Dark theme modelled on the "Strivo" running-app reference: near-black canvas, lime accent
   (`AppColors.lime`), frosted glass cards, top lime glow, pill tabs, centre orb button.
 - Tokens in `core/theme/app_colors.dart`; theme in `core/theme/app_theme.dart`; shared widgets in
-  `core/widgets/` (GlassCard, GlassStatTile, GlowBackground, CircleIconButton, PillTabs, OrbButton).
+  `core/widgets/` (GlassCard, GlassStatTile, GlowBackground, CircleIconButton, PillTabs, OrbButton,
+  FadeSlideIn, FadeIndexedStack).
 - Font: Prompt (Thai + Latin), bundled in `assets/fonts/` (OFL).
+- Launch: native splash is plain `#0C0D0B` (`flutter_native_splash` config in pubspec), then the
+  animated `core/splash/SplashPage` (icon pop + ripple, route line draws, ~1.7 s) fades into
+  `HomePage`. App icon from `assets/icon/app_icon.png` (`flutter_launcher_icons`).
+- Motion: Android routes use `FadeForwardsPageTransitionsBuilder` (iOS keeps Cupertino swipe-back);
+  home tabs cross-fade via `FadeIndexedStack` (keeps state, inactive tab goes offstage);
+  dashboard sections stagger in with `FadeSlideIn`. All honour OS "remove animations".
 - Maps use CARTO dark tiles (attribution: OpenStreetMap contributors, CARTO).
 
 ## State management
@@ -42,10 +49,11 @@ Rules (enforced for every feature by `test/architecture_test.dart`):
 - `RecordState.segments` is a live view that grows in place; equality uses `revision`.
 - `RecordState.failure` is one-shot: `copyWith` clears it unless passed again.
 - Photo export: the page rasterizes its `RepaintBoundary` at 1080 px wide and hands the PNG
-  render callback to the cubit. With no photo the export is transparent (checkerboard is preview-only).
+  render callback to the cubit. The cut-out checkerboard is preview-only (outside the boundary).
 - Share image options: layouts (classic Strava-style default, glass, full, statsOnly, routeOnly),
-  1–4 stats (distance, avg speed, pace, time, elevation), TH/EN labels, and without a photo either
-  a branded card background (default, opaque) or transparent. `_render` precaches the photo first
+  1–4 stats (distance, avg speed, pace, time, elevation), TH/EN labels. Background is the photo
+  (or a branded opaque card without one), or "พื้นใส" cut-out: only text + route, transparent PNG,
+  no shadows or glass tiles; it hides (not deletes) a chosen photo. `_render` precaches the photo first
   so a just-picked image is never exported blank.
 
 ## Commands

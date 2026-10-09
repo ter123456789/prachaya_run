@@ -40,6 +40,20 @@ void main() {
   );
 
   blocTest<PhotoOverlayCubit, PhotoOverlayState>(
+    'cut-out keeps the photo; picking a new one shows it again',
+    build: build,
+    act: (cubit) async {
+      photos.next = photo;
+      await cubit.pickPhoto(PhotoOrigin.gallery);
+      cubit.setBackground(OverlayBackground.transparent);
+      expect(cubit.state.isCutout, isTrue);
+      expect(cubit.state.photo, same(photo));
+      await cubit.pickPhoto(PhotoOrigin.gallery);
+    },
+    verify: (cubit) => expect(cubit.state.isCutout, isFalse),
+  );
+
+  blocTest<PhotoOverlayCubit, PhotoOverlayState>(
     'save renders and stores the PNG',
     build: build,
     act: (cubit) => cubit.save(() async => png),

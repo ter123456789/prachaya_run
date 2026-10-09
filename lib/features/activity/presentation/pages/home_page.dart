@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/widgets/fade_indexed_stack.dart';
 import '../../../../core/widgets/orb_button.dart';
 import '../bloc/record/record_bloc.dart';
 import 'dashboard_page.dart';
@@ -24,7 +25,7 @@ class _HomePageState extends State<HomePage> {
   Widget build(BuildContext context) {
     return Scaffold(
       extendBody: true,
-      body: IndexedStack(
+      body: FadeIndexedStack(
         index: _index,
         children: [
           DashboardPage(
@@ -121,8 +122,18 @@ class _NavIcon extends StatelessWidget {
         onPressed: onTap,
         tooltip: label,
         iconSize: 28,
-        color: selected ? AppColors.lime : AppColors.textSecondary,
-        icon: Icon(icon),
+        icon: AnimatedScale(
+          scale: selected ? 1.12 : 1,
+          duration: const Duration(milliseconds: 220),
+          curve: Curves.easeOutBack,
+          child: TweenAnimationBuilder<Color?>(
+            tween: ColorTween(
+              end: selected ? AppColors.lime : AppColors.textSecondary,
+            ),
+            duration: const Duration(milliseconds: 220),
+            builder: (context, color, _) => Icon(icon, color: color),
+          ),
+        ),
       ),
     );
   }

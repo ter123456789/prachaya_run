@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
@@ -7,21 +8,24 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:prachaya_run/features/photo_share/domain/services/image_sink.dart';
 import 'package:prachaya_run/features/photo_share/domain/services/photo_source.dart';
 import 'package:prachaya_run/features/photo_share/presentation/pages/photo_overlay_page.dart';
+import 'package:prachaya_run/features/photo_share/presentation/widgets/activity_overlay.dart';
 
 import '../../helpers/fakes.dart';
 
 void main() {
   late FakeImageSink sink;
+  late FakePhotoSource photos;
 
   Future<void> openEditor(WidgetTester tester) async {
     tester.view.physicalSize = const Size(1179, 2556);
     tester.view.devicePixelRatio = 3;
     addTearDown(tester.view.reset);
     sink = FakeImageSink();
+    photos = FakePhotoSource();
     await tester.pumpWidget(
       MultiRepositoryProvider(
         providers: [
-          RepositoryProvider<PhotoSource>.value(value: FakePhotoSource()),
+          RepositoryProvider<PhotoSource>.value(value: photos),
           RepositoryProvider<ImageSink>.value(value: sink),
         ],
         child: MaterialApp(
@@ -94,6 +98,37 @@ void main() {
     expect(cornerAlpha, 0);
   });
 
+  testWidgets('transparent with a photo cuts the photo out too', (
+    tester,
+  ) async {
+    await openEditor(tester);
+    photos.next = _onePixelPng;
+    await tester.tap(find.text('เลือกรูป').last);
+    await tester.pumpAndSettle();
+    expect(find.text('ลบรูป'), findsOneWidget);
+
+    await tapChip(tester, 'พื้นใส');
+    expect(find.byType(Image), findsNothing);
+
+    final (_, cornerAlpha) = await inspect(tester, await exportPng(tester));
+    expect(cornerAlpha, 0);
+  });
+
+  testWidgets('transparent glass layout drops the frosted tiles', (
+    tester,
+  ) async {
+    await openEditor(tester);
+    await tapChip(tester, 'พื้นใส');
+    await tapChip(tester, 'กระจก');
+    expect(
+      find.descendant(
+        of: find.byType(ActivityOverlay),
+        matching: find.byType(BackdropFilter),
+      ),
+      findsNothing,
+    );
+  });
+
   testWidgets('stat chips toggle what is drawn', (tester) async {
     await openEditor(tester);
     expect(find.textContaining('/กม.'), findsNothing);
@@ -116,3 +151,10 @@ void main() {
     expect(find.text('PRACHAYA RUN'), findsOneWidget);
   });
 }
+
+/// Opaque red 1×1 PNG.
+final _onePixelPng = Uint8List.fromList(
+  base64Decode(
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFBQIAX8jx0gAAAABJRU5ErkJggg==',
+  ),
+);

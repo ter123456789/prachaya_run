@@ -93,6 +93,16 @@ abstract final class AppTheme {
         color: AppColors.lime,
       ),
       dividerTheme: const DividerThemeData(color: AppColors.glassBorder),
+      // Android: fade-through with a short slide (Android 14+ style), on our
+      // dark canvas so nothing flashes black. iOS keeps swipe-to-go-back.
+      pageTransitionsTheme: const PageTransitionsTheme(
+        builders: {
+          TargetPlatform.android: FadeForwardsPageTransitionsBuilder(
+            backgroundColor: AppColors.background,
+          ),
+          TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
+        },
+      ),
     );
   }
 }

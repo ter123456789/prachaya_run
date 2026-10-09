@@ -24,6 +24,7 @@ class ActivityOverlay extends StatelessWidget {
     this.language = OverlayLanguage.th,
     this.routeColor,
     this.showHeader = false,
+    this.cutout = false,
   });
 
   final Activity activity;
@@ -40,8 +41,12 @@ class ActivityOverlay extends StatelessWidget {
   /// there is no photo to give context.
   final bool showHeader;
 
+  /// Transparent export: only text and route, with no shadows or tile
+  /// backgrounds left behind as grey halos.
+  final bool cutout;
+
   /// Light ink gets a shadow so it stays readable on bright photos.
-  bool get _needsShadow => color.computeLuminance() > 0.5;
+  bool get _needsShadow => !cutout && color.computeLuminance() > 0.5;
 
   @override
   Widget build(BuildContext context) {
@@ -117,7 +122,7 @@ class ActivityOverlay extends StatelessWidget {
                     Expanded(
                       child: Padding(
                         padding: EdgeInsets.symmetric(horizontal: 3 * u),
-                        child: _GlassStat(s, u: u, color: color),
+                        child: _GlassStat(s, u: u, color: color, plain: cutout),
                       ),
                     ),
                 ],
@@ -277,21 +282,31 @@ class _Header extends StatelessWidget {
 
 /// Frosted tile like the floating stat chips in the reference design.
 class _GlassStat extends StatelessWidget {
-  const _GlassStat(this.item, {required this.u, required this.color});
+  const _GlassStat(
+    this.item, {
+    required this.u,
+    required this.color,
+    this.plain = false,
+  });
 
   final _StatItem item;
   final double u;
   final Color color;
 
+  /// Content only, without the frosted tile.
+  final bool plain;
+
   @override
   Widget build(BuildContext context) {
+    final padding = EdgeInsets.symmetric(horizontal: 10 * u, vertical: 10 * u);
+    if (plain) return Padding(padding: padding, child: _content());
     final radius = BorderRadius.circular(14 * u);
     return ClipRRect(
       borderRadius: radius,
       child: BackdropFilter(
         filter: ImageFilter.blur(sigmaX: 10 * u, sigmaY: 10 * u),
         child: Container(
-          padding: EdgeInsets.symmetric(horizontal: 10 * u, vertical: 10 * u),
+          padding: padding,
           decoration: BoxDecoration(
             borderRadius: radius,
             color: Colors.black.withValues(alpha: 0.28),
@@ -300,36 +315,38 @@ class _GlassStat extends StatelessWidget {
               width: u,
             ),
           ),
-          child: FittedBox(
-            fit: BoxFit.scaleDown,
-            alignment: Alignment.centerLeft,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Icon(item.icon, size: 16 * u, color: color),
-                SizedBox(height: 4 * u),
-                Text(
-                  item.label,
-                  style: TextStyle(
-                    fontSize: 10 * u,
-                    color: color.withValues(alpha: 0.8),
-                  ),
-                ),
-                Text(
-                  item.value,
-                  style: TextStyle(
-                    fontSize: 17 * u,
-                    fontWeight: FontWeight.w500,
-                    fontFeatures: const [FontFeature.tabularFigures()],
-                  ),
-                ),
-              ],
-            ),
-          ),
+          child: _content(),
         ),
       ),
     );
   }
+
+  Widget _content() => FittedBox(
+    fit: BoxFit.scaleDown,
+    alignment: Alignment.centerLeft,
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(item.icon, size: 16 * u, color: color),
+        SizedBox(height: 4 * u),
+        Text(
+          item.label,
+          style: TextStyle(
+            fontSize: 10 * u,
+            color: color.withValues(alpha: 0.8),
+          ),
+        ),
+        Text(
+          item.value,
+          style: TextStyle(
+            fontSize: 17 * u,
+            fontWeight: FontWeight.w500,
+            fontFeatures: const [FontFeature.tabularFigures()],
+          ),
+        ),
+      ],
+    ),
+  );
 }
 
 class _Stat extends StatelessWidget {

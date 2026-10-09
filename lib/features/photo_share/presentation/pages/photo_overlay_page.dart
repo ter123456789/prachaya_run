@@ -16,7 +16,7 @@ import '../bloc/photo_overlay_cubit.dart';
 import '../widgets/activity_overlay.dart';
 
 /// Lets the user put the route, time and distance on top of their own photo
-/// (or a transparent sticker) and save or share it.
+/// (or cut out as a transparent sticker) and save or share it.
 class PhotoOverlayPage extends StatefulWidget {
   const PhotoOverlayPage({super.key});
 
@@ -45,8 +45,9 @@ class _PhotoOverlayPageState extends State<PhotoOverlayPage> {
     // A just-picked photo may still be decoding; capturing now would export
     // a blank background. MemoryImage keys on the bytes, so this resolves
     // the same cached image the preview uses.
-    final photo = context.read<PhotoOverlayCubit>().state.photo;
-    if (photo != null) {
+    final state = context.read<PhotoOverlayCubit>().state;
+    final photo = state.photo;
+    if (photo != null && !state.isCutout) {
       await precacheImage(MemoryImage(photo), context);
       await WidgetsBinding.instance.endOfFrame;
     }
@@ -207,15 +208,16 @@ class _Preview extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final photo = state.photo;
-    final card = photo == null && state.background == OverlayBackground.card;
+    final cutout = state.isCutout;
+    final photo = cutout ? null : state.photo;
+    final card = photo == null && !cutout;
     return ClipRRect(
       borderRadius: BorderRadius.circular(20),
       child: Stack(
         fit: StackFit.expand,
         children: [
           // Outside the boundary: shows transparency without exporting it.
-          if (photo == null && !card) const _Checkerboard(),
+          if (cutout) const _Checkerboard(),
           RepaintBoundary(
             key: canvasKey,
             child: Stack(
@@ -236,6 +238,7 @@ class _Preview extends StatelessWidget {
                   stats: state.stats,
                   language: state.language,
                   showHeader: card,
+                  cutout: cutout,
                   color: _tintColor(context, state.tint),
                   // White text with a lime route, like Strava's orange line.
                   routeColor: state.tint == OverlayTint.white
@@ -291,23 +294,24 @@ class _Options extends StatelessWidget {
                   onPressed: () => cubit.pickPhoto(PhotoOrigin.camera),
                 ),
                 const SizedBox(width: 8),
-                if (state.photo != null)
+                if (state.photo != null) ...[
                   _GlassChip(
                     icon: Icons.hide_image_outlined,
                     label: 'ลบรูป',
                     onPressed: cubit.removePhoto,
-                  )
-                else
-                  _GlassChip(
-                    icon: Icons.layers_clear_outlined,
-                    label: 'พื้นใส',
-                    selected: state.background == OverlayBackground.transparent,
-                    onPressed: () => cubit.setBackground(
-                      state.background == OverlayBackground.transparent
-                          ? OverlayBackground.card
-                          : OverlayBackground.transparent,
-                    ),
                   ),
+                  const SizedBox(width: 8),
+                ],
+                _GlassChip(
+                  icon: Icons.layers_clear_outlined,
+                  label: 'พื้นใส',
+                  selected: state.isCutout,
+                  onPressed: () => cubit.setBackground(
+                    state.isCutout
+                        ? OverlayBackground.card
+                        : OverlayBackground.transparent,
+                  ),
+                ),
                 const SizedBox(width: 16),
                 for (final tint in OverlayTint.values)
                   Padding(

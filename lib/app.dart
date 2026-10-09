@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import 'core/splash/splash_page.dart';
 import 'core/theme/app_theme.dart';
 import 'features/activity/domain/repositories/activity_repository.dart';
 import 'features/activity/domain/services/location_tracker.dart';
@@ -51,7 +52,7 @@ class PrachayaRunApp extends StatelessWidget {
           title: 'Prachaya Run',
           debugShowCheckedModeBanner: false,
           theme: AppTheme.dark(),
-          home: const HomePage(),
+          home: SplashPage(next: (_) => const HomePage()),
         ),
       ),
     );

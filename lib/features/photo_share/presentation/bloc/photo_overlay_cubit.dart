@@ -35,12 +35,13 @@ enum OverlayTint { white, black, brand }
 /// Numbers that can appear on the image, in display order.
 enum OverlayStat { distance, avgSpeed, pace, time, elevation }
 
-/// What sits behind the graphic when no photo is chosen.
+/// What sits behind the route and stats.
 enum OverlayBackground {
-  /// Branded dark card: ready to post anywhere.
+  /// The chosen photo, or a branded dark card when there is none.
   card,
 
-  /// Transparent PNG for layering on an IG story.
+  /// Cut out: only the text and route, as a transparent PNG for layering on
+  /// an IG story. A chosen photo is kept but hidden.
   transparent,
 }
 
@@ -68,7 +69,8 @@ final class PhotoOverlayState extends Equatable {
   ];
   static const maxStats = 4;
 
-  /// Background photo; null falls back to [background].
+  /// Background photo; null falls back to the card. Hidden while
+  /// [isCutout].
   final Uint8List? photo;
   final OverlayLayout layout;
   final OverlayFrame frame;
@@ -80,6 +82,8 @@ final class PhotoOverlayState extends Equatable {
   final OverlayLanguage language;
   final PhotoOverlayStatus status;
   final PhotoOverlayFailure? failure;
+
+  bool get isCutout => background == OverlayBackground.transparent;
 
   bool get isBusy =>
       status == PhotoOverlayStatus.picking ||
@@ -146,7 +150,14 @@ class PhotoOverlayCubit extends Cubit<PhotoOverlayState> {
     emit(state.copyWith(status: PhotoOverlayStatus.picking));
     try {
       final photo = await _photoSource.pick(origin);
-      emit(state.copyWith(photo: photo, status: PhotoOverlayStatus.editing));
+      // A freshly picked photo is meant to be seen, so leave cut-out mode.
+      emit(
+        state.copyWith(
+          photo: photo,
+          background: photo == null ? null : OverlayBackground.card,
+          status: PhotoOverlayStatus.editing,
+        ),
+      );
     } catch (_) {
       emit(
         state.copyWith(

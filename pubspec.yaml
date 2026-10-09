@@ -57,6 +57,8 @@ dev_dependencies:
   # rules and activating additional ones.
   flutter_lints: ^6.0.0
   bloc_test: ^10.0.0
+  flutter_launcher_icons: ^0.14.4
+  flutter_native_splash: ^2.4.7
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
@@ -68,6 +70,9 @@ flutter:
   # included with your application, so that you can use the icons in
   # the material Icons class.
   uses-material-design: true
+
+  assets:
+    - assets/icon/app_icon.png
 
   # To add assets to your application, add an assets section, like this:
   # assets:
@@ -110,3 +115,23 @@ flutter:
           weight: 600
         - asset: assets/fonts/Prompt-Bold.ttf
           weight: 700
+
+# App icon: square crop of assets/images/icon_apps.webp.
+# Regenerate with `dart run flutter_launcher_icons`.
+flutter_launcher_icons:
+  image_path: assets/icon/app_icon.png
+  android: true
+  ios: true
+  remove_alpha_ios: true
+  adaptive_icon_background: "#0C0D0B"
+  adaptive_icon_foreground: assets/icon/app_icon.png
+
+# Native launch screen: plain app-dark so there is no white flash before the
+# animated Flutter splash (lib/core/splash). Android 12+ shows the launcher
+# icon on it. Regenerate with `dart run flutter_native_splash:create`.
+flutter_native_splash:
+  color: "#0C0D0B"
+  web: false
+  android_12:
+    color: "#0C0D0B"
+    icon_background_color: "#0C0D0B"

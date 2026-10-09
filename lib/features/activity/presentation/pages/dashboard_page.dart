@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/formatters.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/widgets/fade_slide_in.dart';
 import '../../../../core/widgets/glass_card.dart';
 import '../../../../core/widgets/glass_stat_tile.dart';
 import '../../../../core/widgets/glow_background.dart';
@@ -42,36 +43,63 @@ class DashboardPage extends StatelessWidget {
               child: ListView(
                 padding: const EdgeInsets.fromLTRB(20, 16, 20, 140),
                 children: [
-                  Text(
-                    'สวัสดี${timeOfDayPeriod(now)}',
-                    style: const TextStyle(
-                      fontSize: 15,
-                      color: AppColors.textSecondary,
+                  // Sections rise in one after another on first show.
+                  FadeSlideIn(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'สวัสดี${timeOfDayPeriod(now)}',
+                          style: const TextStyle(
+                            fontSize: 15,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        const Text(
+                          'พร้อมออกไปวิ่งหรือยัง?',
+                          style: TextStyle(
+                            fontSize: 26,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
                     ),
-                  ),
-                  const SizedBox(height: 4),
-                  const Text(
-                    'พร้อมออกไปวิ่งหรือยัง?',
-                    style: TextStyle(fontSize: 26, fontWeight: FontWeight.w500),
                   ),
                   _RecordingBanner(onTap: onStart),
                   const SizedBox(height: 28),
-                  const _SectionTitle('ความคืบหน้าสัปดาห์นี้'),
-                  const SizedBox(height: 12),
-                  _ProgressGrid(week: state.week),
-                  const SizedBox(height: 28),
-                  _SectionTitle(
-                    'กิจกรรมล่าสุด',
-                    action: TextButton(
-                      onPressed: onSeeAll,
-                      child: const Text('ดูทั้งหมด'),
+                  FadeSlideIn(
+                    delay: const Duration(milliseconds: 90),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        const _SectionTitle('ความคืบหน้าสัปดาห์นี้'),
+                        const SizedBox(height: 12),
+                        _ProgressGrid(week: state.week),
+                      ],
                     ),
                   ),
-                  const SizedBox(height: 8),
-                  _LatestActivity(
-                    activity: state.latest,
-                    now: now,
-                    onStart: onStart,
+                  const SizedBox(height: 28),
+                  FadeSlideIn(
+                    delay: const Duration(milliseconds: 180),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        _SectionTitle(
+                          'กิจกรรมล่าสุด',
+                          action: TextButton(
+                            onPressed: onSeeAll,
+                            child: const Text('ดูทั้งหมด'),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        _LatestActivity(
+                          activity: state.latest,
+                          now: now,
+                          onStart: onStart,
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               ),
