@@ -13,7 +13,11 @@ class LocalSyncState {
     required this.synced,
     required this.deleted,
     required this.hasTrack,
+    this.photoCount = 0,
   });
+
+  /// The server's photo count last seen.
+  final int photoCount;
 
   /// Null while unclaimed (recorded signed out).
   final String? ownerId;
@@ -207,18 +211,29 @@ class ActivityLocalDataSource {
       if (state != null) {
         // A local edit at least as new wins; it is uploaded next.
         if (!state.synced && state.updatedAtMs >= remoteMs) return false;
-        if (state.synced && state.updatedAtMs == remoteMs) return false;
+        if (state.synced && state.updatedAtMs == remoteMs) {
+          // Same activity; only its photos may have changed elsewhere.
+          if (state.photoCount == s.photoCount) return false;
+          await txn.update(
+            _activities,
+            {'photo_count': s.photoCount, 'photos_stale': 1},
+            where: 'id = ?',
+            whereArgs: [s.id],
+          );
+          return true;
+        }
         await _deleteTrack(txn, s.id);
       }
-      await txn.insert(
-        _activities,
-        ActivityRowMapper.remoteSummaryToRow(
+      await txn.insert(_activities, {
+        ...ActivityRowMapper.remoteSummaryToRow(
           s,
           hasTrack: false,
           ownerId: ownerId,
         ),
-        conflictAlgorithm: ConflictAlgorithm.replace,
-      );
+        'photos_stale': s.photoCount > 0 || (state?.photoCount ?? 0) > 0
+            ? 1
+            : 0,
+      }, conflictAlgorithm: ConflictAlgorithm.replace);
       return true;
     });
   }
@@ -235,15 +250,25 @@ class ActivityLocalDataSource {
           (!state.synced || state.deleted || state.ownerId != ownerId)) {
         return;
       }
-      await txn.insert(
-        _activities,
-        ActivityRowMapper.remoteSummaryToRow(
-          s,
-          hasTrack: true,
-          ownerId: ownerId,
-        ),
-        conflictAlgorithm: ConflictAlgorithm.replace,
+      final row = ActivityRowMapper.remoteSummaryToRow(
+        s,
+        hasTrack: true,
+        ownerId: ownerId,
       );
+      if (state == null) {
+        await txn.insert(_activities, {
+          ...row,
+          'photos_stale': s.photoCount > 0 ? 1 : 0,
+        });
+      } else {
+        // Update in place: keeps photos_stale.
+        await txn.update(
+          _activities,
+          row,
+          where: 'id = ?',
+          whereArgs: [activity.id],
+        );
+      }
       await _replaceTrack(txn, activity);
     });
   }
@@ -274,7 +299,14 @@ class ActivityLocalDataSource {
   ) async {
     final rows = await db.query(
       _activities,
-      columns: ['owner_id', 'updated_at', 'synced', 'deleted_at', 'has_track'],
+      columns: [
+        'owner_id',
+        'updated_at',
+        'synced',
+        'deleted_at',
+        'has_track',
+        'photo_count',
+      ],
       where: 'id = ?',
       whereArgs: [id],
       limit: 1,
@@ -287,6 +319,7 @@ class ActivityLocalDataSource {
       synced: r['synced'] == 1,
       deleted: r['deleted_at'] != null,
       hasTrack: r['has_track'] == 1,
+      photoCount: r['photo_count'] as int? ?? 0,
     );
   }
 

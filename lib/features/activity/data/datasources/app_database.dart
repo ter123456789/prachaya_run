@@ -7,7 +7,9 @@ abstract final class AppDatabase {
   static const activitiesTable = 'activities';
   static const trackPointsTable = 'track_points';
   static const syncStateTable = 'sync_state';
-  static const version = 2;
+  static const photosTable = 'activity_photos';
+  static const kvTable = 'kv';
+  static const version = 3;
 
   /// [factory] and [path] let tests use an in-memory FFI database.
   static Future<Database> open({DatabaseFactory? factory, String? path}) async {
@@ -20,9 +22,11 @@ abstract final class AppDatabase {
         onCreate: (db, version) async {
           await _createV1(db);
           await _upgradeToV2(db);
+          await _upgradeToV3(db);
         },
         onUpgrade: (db, oldVersion, newVersion) async {
           if (oldVersion < 2) await _upgradeToV2(db);
+          if (oldVersion < 3) await _upgradeToV3(db);
         },
       ),
     );
@@ -110,5 +114,41 @@ abstract final class AppDatabase {
       );
       await db.delete(activitiesTable, where: 'id = ?', whereArgs: [oldId]);
     }
+  }
+
+  /// v3 (redesign):
+  /// - `activity_photos`: post-run photos, synced like activities
+  ///   (`synced`, `deleted_at` tombstones, `owner_id`). Files live on disk at
+  ///   `local_path`; NULL until a photo from another device is downloaded.
+  /// - `activities.photo_count`: the server's count; `photos_stale` = 1 when
+  ///   the photo list must be fetched again.
+  /// - `kv`: small cached JSON (profile, challenge, weather).
+  static Future<void> _upgradeToV3(Database db) async {
+    await db.execute('''
+      CREATE TABLE $photosTable (
+        id TEXT PRIMARY KEY,
+        activity_id TEXT NOT NULL,
+        owner_id TEXT,
+        local_path TEXT,
+        taken_at INTEGER NOT NULL,
+        synced INTEGER NOT NULL DEFAULT 0,
+        deleted_at INTEGER
+      )''');
+    await db.execute(
+      'CREATE INDEX idx_photos_activity ON $photosTable(activity_id)',
+    );
+    await db.execute(
+      'ALTER TABLE $activitiesTable '
+      'ADD COLUMN photo_count INTEGER NOT NULL DEFAULT 0',
+    );
+    await db.execute(
+      'ALTER TABLE $activitiesTable '
+      'ADD COLUMN photos_stale INTEGER NOT NULL DEFAULT 0',
+    );
+    await db.execute('''
+      CREATE TABLE $kvTable (
+        key TEXT PRIMARY KEY,
+        value TEXT NOT NULL
+      )''');
   }
 }

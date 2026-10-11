@@ -10,6 +10,7 @@ class WeeklyStats {
     required this.elevationGainMeters,
     required this.activityCount,
     required this.previousWeekDistanceMeters,
+    this.todayDistanceMeters = 0,
   });
 
   factory WeeklyStats.from(Iterable<ActivitySummary> activities, DateTime now) {
@@ -35,8 +36,14 @@ class WeeklyStats {
     var time = Duration.zero;
     var count = 0;
     var previousDistance = 0.0;
+    var today = 0.0;
+    final todayStart = DateTime(now.year, now.month, now.day);
+    final tomorrow = DateTime(now.year, now.month, now.day + 1);
     for (final a in activities) {
       final t = a.startedAt;
+      if (!t.isBefore(todayStart) && t.isBefore(tomorrow)) {
+        today += a.distanceMeters;
+      }
       if (!t.isBefore(weekStart) && t.isBefore(nextWeekStart)) {
         distance += a.distanceMeters;
         elevation += a.elevationGainMeters;
@@ -53,6 +60,7 @@ class WeeklyStats {
       elevationGainMeters: elevation,
       activityCount: count,
       previousWeekDistanceMeters: previousDistance,
+      todayDistanceMeters: today,
     );
   }
 
@@ -62,6 +70,37 @@ class WeeklyStats {
   final double elevationGainMeters;
   final int activityCount;
   final double previousWeekDistanceMeters;
+  final double todayDistanceMeters;
+
+  /// ISO 8601 week number (weeks start Monday; week 1 holds 4 January).
+  int get weekNumber {
+    // The Thursday of this week decides which year the week belongs to.
+    final thursday = DateTime(
+      weekStart.year,
+      weekStart.month,
+      weekStart.day + 3,
+    );
+    final firstThursday = DateTime(thursday.year, 1, 4);
+    final firstWeekStart = DateTime(
+      firstThursday.year,
+      1,
+      4 - (firstThursday.weekday - 1),
+    );
+    final days = DateTime.utc(weekStart.year, weekStart.month, weekStart.day)
+        .difference(
+          DateTime.utc(
+            firstWeekStart.year,
+            firstWeekStart.month,
+            firstWeekStart.day,
+          ),
+        )
+        .inDays;
+    return days ~/ 7 + 1;
+  }
+
+  /// Climb per distance this week, in percent (0 when nothing recorded).
+  double get averageGradePercent =>
+      distanceMeters <= 0 ? 0 : elevationGainMeters / distanceMeters * 100;
 
   /// 0–1 share of [goalMeters] covered this week.
   double progressToward(double goalMeters) =>

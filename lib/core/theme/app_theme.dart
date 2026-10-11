@@ -7,12 +7,13 @@ abstract final class AppTheme {
     const scheme = ColorScheme.dark(
       primary: AppColors.lime,
       onPrimary: AppColors.onLime,
-      secondary: AppColors.lime,
+      secondary: AppColors.mint,
       onSecondary: AppColors.onLime,
       surface: AppColors.background,
       onSurface: AppColors.textPrimary,
       onSurfaceVariant: AppColors.textSecondary,
-      surfaceContainerHighest: AppColors.surface,
+      surfaceContainerHighest: AppColors.surfaceHigh,
+      surfaceContainer: AppColors.surface,
       outline: AppColors.glassBorder,
       error: AppColors.negative,
     );
@@ -44,20 +45,21 @@ abstract final class AppTheme {
         style: FilledButton.styleFrom(
           backgroundColor: AppColors.lime,
           foregroundColor: AppColors.onLime,
-          minimumSize: const Size(64, 52),
+          disabledBackgroundColor: AppColors.surfaceHigh,
+          minimumSize: const Size(64, 56),
           shape: const StadiumBorder(),
           textStyle: const TextStyle(
             fontFamily: 'Prompt',
             fontSize: 16,
-            fontWeight: FontWeight.w600,
+            fontWeight: FontWeight.w700,
           ),
         ),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
           foregroundColor: AppColors.textPrimary,
-          backgroundColor: AppColors.glassFill,
-          minimumSize: const Size(64, 52),
+          backgroundColor: AppColors.surfaceHigh,
+          minimumSize: const Size(64, 56),
           side: const BorderSide(color: AppColors.glassBorder),
           shape: const StadiumBorder(),
           textStyle: const TextStyle(
@@ -89,6 +91,47 @@ abstract final class AppTheme {
           side: const BorderSide(color: AppColors.glassBorder),
         ),
       ),
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        fillColor: AppColors.surface,
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 16,
+        ),
+        hintStyle: const TextStyle(color: AppColors.textMuted),
+        labelStyle: const TextStyle(color: AppColors.textSecondary),
+        floatingLabelStyle: const TextStyle(color: AppColors.lime),
+        prefixIconColor: AppColors.textSecondary,
+        suffixIconColor: AppColors.textSecondary,
+        border: _inputBorder(AppColors.glassBorder),
+        enabledBorder: _inputBorder(AppColors.glassBorder),
+        disabledBorder: _inputBorder(AppColors.glassFill),
+        focusedBorder: _inputBorder(AppColors.lime, width: 1.5),
+        errorBorder: _inputBorder(AppColors.negative),
+        focusedErrorBorder: _inputBorder(AppColors.negative, width: 1.5),
+        errorStyle: const TextStyle(color: AppColors.negative),
+      ),
+      switchTheme: SwitchThemeData(
+        thumbColor: WidgetStateProperty.resolveWith(
+          (s) => s.contains(WidgetState.selected)
+              ? AppColors.onLime
+              : AppColors.textSecondary,
+        ),
+        trackColor: WidgetStateProperty.resolveWith(
+          (s) => s.contains(WidgetState.selected)
+              ? AppColors.lime
+              : AppColors.surfaceHigh,
+        ),
+        trackOutlineColor: const WidgetStatePropertyAll(Colors.transparent),
+      ),
+      bottomSheetTheme: const BottomSheetThemeData(
+        backgroundColor: AppColors.surface,
+        surfaceTintColor: Colors.transparent,
+        dragHandleColor: AppColors.textMuted,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+        ),
+      ),
       progressIndicatorTheme: const ProgressIndicatorThemeData(
         color: AppColors.lime,
       ),
@@ -105,4 +148,10 @@ abstract final class AppTheme {
       ),
     );
   }
+
+  static OutlineInputBorder _inputBorder(Color color, {double width = 1}) =>
+      OutlineInputBorder(
+        borderRadius: BorderRadius.circular(18),
+        borderSide: BorderSide(color: color, width: width),
+      );
 }

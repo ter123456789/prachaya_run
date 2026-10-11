@@ -48,6 +48,7 @@ abstract final class ActivityRowMapper {
     'synced': 1,
     'has_track': hasTrack ? 1 : 0,
     'owner_id': ownerId,
+    'photo_count': s.photoCount,
   };
 
   static Iterable<Row> pointsToRows(Activity a) sync* {

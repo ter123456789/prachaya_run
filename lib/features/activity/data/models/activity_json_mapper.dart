@@ -43,6 +43,13 @@ abstract final class ActivityJsonMapper {
     distanceMeters: (json['distanceM']! as num).toDouble(),
     elevationGainMeters: (json['elevationGainM']! as num).toDouble(),
     deletedAt: json['deletedAt'] == null ? null : parseTime(json['deletedAt']),
+    photoCount: (json['photoCount'] as num?)?.toInt() ?? 0,
+  );
+
+  static RemotePhoto photoFromJson(Json json) => RemotePhoto(
+    id: json['id']! as String,
+    url: Uri.parse(json['url']! as String),
+    takenAt: parseTime(json['takenAt']),
   );
 
   static Activity activityFromJson(Json json) => Activity(

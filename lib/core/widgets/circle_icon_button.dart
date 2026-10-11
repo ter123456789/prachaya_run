@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 
 import '../theme/app_colors.dart';
+import 'pressable.dart';
 
-/// Round glass button used for back / more / secondary actions.
+/// Round button for back / share / delete / secondary actions.
 class CircleIconButton extends StatelessWidget {
   const CircleIconButton({
     super.key,
@@ -11,6 +12,7 @@ class CircleIconButton extends StatelessWidget {
     this.tooltip,
     this.size = 48,
     this.filled = false,
+    this.iconColor,
   });
 
   final IconData icon;
@@ -21,51 +23,51 @@ class CircleIconButton extends StatelessWidget {
   /// Lime primary variant (e.g. the big play/pause button).
   final bool filled;
 
+  /// e.g. [AppColors.negative] for delete.
+  final Color? iconColor;
+
   @override
   Widget build(BuildContext context) {
     final enabled = onPressed != null;
-    final button = Material(
-      color: filled ? AppColors.lime : AppColors.glassFill,
-      shape: CircleBorder(
-        side: filled
-            ? BorderSide.none
-            : const BorderSide(color: AppColors.glassBorder),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onPressed,
-        child: SizedBox.square(
-          dimension: size,
-          child: Icon(
-            icon,
-            size: size * 0.42,
-            color: filled
-                ? AppColors.onLime
-                : enabled
-                ? AppColors.textPrimary
-                : AppColors.textMuted,
-          ),
+    final button = Pressable(
+      onTap: onPressed,
+      scale: 0.92,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: filled ? AppColors.lime : AppColors.surfaceHigh,
+          border: filled ? null : Border.all(color: AppColors.glassBorder),
+          boxShadow: filled
+              ? [
+                  BoxShadow(
+                    color: AppColors.lime.withValues(alpha: 0.40),
+                    blurRadius: 28,
+                    spreadRadius: 2,
+                  ),
+                ]
+              : null,
+        ),
+        child: Icon(
+          icon,
+          size: size * 0.44,
+          color: filled
+              ? AppColors.onLime
+              : !enabled
+              ? AppColors.textMuted
+              : iconColor ?? AppColors.textPrimary,
         ),
       ),
     );
-    final decorated = filled
-        ? DecoratedBox(
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              boxShadow: [
-                BoxShadow(
-                  color: AppColors.lime.withValues(alpha: 0.35),
-                  blurRadius: 28,
-                  spreadRadius: 2,
-                ),
-              ],
-              border: Border.all(color: AppColors.glassBorder, width: 8),
-            ),
-            child: button,
-          )
-        : button;
-    return tooltip == null
-        ? decorated
-        : Tooltip(message: tooltip, child: decorated);
+    return Semantics(
+      button: true,
+      enabled: enabled,
+      label: tooltip,
+      child: tooltip == null
+          ? button
+          : Tooltip(message: tooltip, child: button),
+    );
   }
 }

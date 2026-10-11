@@ -67,6 +67,9 @@ class ApiClient {
 
   Future<Object?> delete(String path) => send('DELETE', path);
 
+  Future<Object?> patch(String path, Object? body) =>
+      send('PATCH', path, body: body);
+
   Future<Object?> send(
     String method,
     String path, {
@@ -74,28 +77,67 @@ class ApiClient {
     Object? body,
     bool auth = true,
     bool gzipBody = false,
-  }) async {
+  }) {
     final bytes = body == null ? null : utf8.encode(jsonEncode(body));
     final payload = bytes != null && gzipBody ? gzip.encode(bytes) : bytes;
+    return _send(
+      auth: auth,
+      build: () {
+        final request = http.Request(method, _uri(path, query))
+          ..headers.addAll({
+            'Accept': 'application/json',
+            if (payload != null) 'Content-Type': 'application/json',
+            if (payload != null && gzipBody) 'Content-Encoding': 'gzip',
+          });
+        if (payload != null) request.bodyBytes = payload;
+        return request;
+      },
+    );
+  }
 
+  /// Authenticated multipart upload: one file part plus text [fields].
+  Future<Object?> sendMultipart(
+    String method,
+    String path, {
+    required String fileField,
+    required List<int> fileBytes,
+    required String filename,
+    Map<String, String> fields = const {},
+  }) => _send(
+    auth: true,
+    build: () => http.MultipartRequest(method, _uri(path, null))
+      ..headers['Accept'] = 'application/json'
+      ..fields.addAll(fields)
+      ..files.add(
+        http.MultipartFile.fromBytes(fileField, fileBytes, filename: filename),
+      ),
+  );
+
+  /// Plain GET of an absolute URL (e.g. a signed photo URL), no auth.
+  Future<List<int>> download(Uri url) async {
+    final response = await _execute(http.Request('GET', url));
+    if (response.statusCode != 200) {
+      throw ApiException(response.statusCode, 'download_failed');
+    }
+    return response.bodyBytes;
+  }
+
+  Future<Object?> _send({
+    required bool auth,
+    required http.BaseRequest Function() build,
+  }) async {
     String? usedToken;
     Future<http.Response> attempt() async {
-      final headers = {
-        'Accept': 'application/json',
-        if (payload != null) 'Content-Type': 'application/json',
-        if (payload != null && gzipBody) 'Content-Encoding': 'gzip',
-      };
+      // Requests are single-use: build a fresh one for every attempt.
+      final request = build();
       if (auth) {
         final session = await _tokens.read();
         if (session == null) {
           throw const ApiException(401, 'unauthorized', 'signed out');
         }
         usedToken = session.accessToken;
-        headers['Authorization'] = 'Bearer ${session.accessToken}';
+        request.headers['Authorization'] = 'Bearer ${session.accessToken}';
       }
-      final request = http.Request(method, _uri(path, query))
-        ..headers.addAll(headers);
-      if (payload != null) request.bodyBytes = payload;
       return _execute(request);
     }
 

@@ -1,11 +1,15 @@
+import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:prachaya_run/core/network/api_client.dart';
 import 'package:prachaya_run/core/network/token_store.dart';
 import 'package:prachaya_run/features/activity/data/datasources/activity_local_data_source.dart';
 import 'package:prachaya_run/features/activity/data/datasources/activity_remote_data_source.dart';
 import 'package:prachaya_run/features/activity/data/datasources/app_database.dart';
+import 'package:prachaya_run/features/activity/data/datasources/photo_local_data_source.dart';
 import 'package:prachaya_run/features/activity/data/models/activity_json_mapper.dart';
 import 'package:prachaya_run/features/activity/data/repositories/offline_first_activity_repository.dart';
+import 'package:prachaya_run/features/activity/data/repositories/offline_first_photo_repository.dart';
 import 'package:prachaya_run/features/activity/data/sync/activity_sync_engine.dart';
 import 'package:prachaya_run/features/activity/domain/entities/activity.dart';
 import 'package:prachaya_run/features/activity/domain/services/activity_sync.dart';
@@ -38,6 +42,8 @@ void main() {
   late ActivitySyncEngine engine;
   late OfflineFirstActivityRepository repository;
   late DateTime now;
+  late Directory photoDir;
+  late PhotoLocalDataSource photos;
 
   setUp(() async {
     server = FakeServer();
@@ -60,16 +66,23 @@ void main() {
       httpClient: server.client,
     );
     final local = ActivityLocalDataSource(db);
+    photoDir = Directory.systemTemp.createTempSync('photos');
+    addTearDown(() => photoDir.deleteSync(recursive: true));
+    photos = PhotoLocalDataSource(db, photoDir);
     engine = ActivitySyncEngine(
       local: local,
       remote: ActivityRemoteDataSource(api),
+      photos: photos,
       tokens: tokens,
     );
+    // Let syncs scheduled by saves finish before the database closes.
+    addTearDown(() => engine.sync());
     now = DateTime(2026, 10, 11, 8);
     repository = OfflineFirstActivityRepository(
       local,
       engine,
       tokens,
+      photos: photos,
       clock: () => now,
     );
   });
@@ -280,6 +293,71 @@ void main() {
       server.offline = false;
       await engine.sync();
       expect(server.uploads, isEmpty);
+    });
+  });
+
+  group('photos', () {
+    // Minimal JPEG / PNG headers are enough: the app sniffs magic bytes.
+    const jpeg = [0xFF, 0xD8, 0xFF, 0xE0, 1, 2, 3, 4, 5, 6, 7, 8];
+    const png = [0x89, 0x50, 0x4E, 0x47, 1, 2, 3, 4, 5, 6, 7, 8];
+
+    late OfflineFirstPhotoRepository photoRepo;
+    setUp(
+      () => photoRepo = OfflineFirstPhotoRepository(photos, engine, tokens),
+    );
+
+    test('a photo is uploaded after its activity, then kept by id', () async {
+      await repository.save(_activity());
+      final photo = await photoRepo.add(_id, jpeg, takenAt: now);
+      expect(photo.localPath, endsWith('${photo.id}.jpg'));
+      expect(await engine.sync(), SyncOutcome.synced);
+
+      expect(server.photos.keys, [photo.id]);
+      final put = server.requests.lastWhere((r) => r.method == 'PUT');
+      expect(put.url.path, '/activities/$_id/photos/${photo.id}');
+
+      // Nothing re-uploaded on the next run.
+      server.requests.clear();
+      await engine.sync();
+      expect(server.requests.where((r) => r.method == 'PUT'), isEmpty);
+      expect(await photoRepo.photosOf(_id), [photo]);
+    });
+
+    test('photos added on another device are downloaded; deletes flow both '
+        'ways', () async {
+      await repository.save(_activity());
+      await engine.sync();
+
+      server.seedPhoto(_id, 'p-remote', png);
+      expect(await engine.sync(), SyncOutcome.synced);
+      var list = await photoRepo.photosOf(_id);
+      expect(list.single.id, 'p-remote');
+      expect(list.single.localPath, endsWith('p-remote.png'));
+      expect(File(list.single.localPath!).readAsBytesSync(), png);
+
+      // Deleted here → DELETE sent, gone on the server.
+      await photoRepo.delete(list.single);
+      expect(await photoRepo.photosOf(_id), isEmpty);
+      await engine.sync();
+      expect(server.photos, isEmpty);
+
+      // Deleted elsewhere → removed here.
+      server.seedPhoto(_id, 'p2', jpeg);
+      await engine.sync();
+      list = await photoRepo.photosOf(_id);
+      expect(list.single.id, 'p2');
+      server.photos.remove('p2');
+      server.activities[_id]!['_serverUpdatedAt'] = 999;
+      await engine.sync();
+      expect(await photoRepo.photosOf(_id), isEmpty);
+    });
+
+    test('deleting an activity removes its photo files', () async {
+      await repository.save(_activity());
+      final photo = await photoRepo.add(_id, jpeg, takenAt: now);
+      await repository.delete(_id);
+      expect(File(photo.localPath!).existsSync(), isFalse);
+      expect(await photoRepo.photosOf(_id), isEmpty);
     });
   });
 }

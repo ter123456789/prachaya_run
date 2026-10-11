@@ -119,6 +119,16 @@ flutter:
           weight: 600
         - asset: assets/fonts/Prompt-Bold.ttf
           weight: 700
+    # Telemetry digits (tabular, no jitter). Latin only: Thai units fall
+    # back to Prompt via fontFamilyFallback.
+    - family: JetBrainsMono
+      fonts:
+        - asset: assets/fonts/JetBrainsMono-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/JetBrainsMono-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/JetBrainsMono-Bold.ttf
+          weight: 700
 
 # App icon: square crop of assets/images/icon_apps.webp.
 # Regenerate with `dart run flutter_launcher_icons`.

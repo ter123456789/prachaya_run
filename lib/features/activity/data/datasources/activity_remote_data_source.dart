@@ -51,4 +51,41 @@ class ActivityRemoteDataSource {
     );
     return ActivityJsonMapper.changesPageFromJson(json! as Json);
   }
+
+  /// Idempotent by [photoId]; the server checks the file type itself.
+  Future<void> uploadPhoto({
+    required String activityId,
+    required String photoId,
+    required List<int> bytes,
+    required String filename,
+    required DateTime takenAt,
+  }) => _api.sendMultipart(
+    'PUT',
+    '/activities/$activityId/photos/$photoId',
+    fileField: 'file',
+    fileBytes: bytes,
+    filename: filename,
+    fields: {'takenAt': ActivityJsonMapper.time(takenAt)},
+  );
+
+  /// Null when the activity is gone.
+  Future<List<RemotePhoto>?> photos(String activityId) async {
+    try {
+      final json = await _api.get('/activities/$activityId/photos') as Json;
+      return [
+        for (final item in (json['items']! as List<Object?>).cast<Json>())
+          ActivityJsonMapper.photoFromJson(item),
+      ];
+    } on ApiException catch (e) {
+      if (e.status == 404) return null;
+      rethrow;
+    }
+  }
+
+  /// Idempotent.
+  Future<void> deletePhoto(String activityId, String photoId) =>
+      _api.delete('/activities/$activityId/photos/$photoId');
+
+  /// Fetches a signed file URL (no auth).
+  Future<List<int>> downloadFile(Uri url) => _api.download(url);
 }

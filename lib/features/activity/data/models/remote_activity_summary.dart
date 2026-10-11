@@ -14,6 +14,7 @@ class RemoteActivitySummary {
     required this.distanceMeters,
     required this.elevationGainMeters,
     this.deletedAt,
+    this.photoCount = 0,
   });
 
   final String id;
@@ -26,6 +27,7 @@ class RemoteActivitySummary {
   final double distanceMeters;
   final double elevationGainMeters;
   final DateTime? deletedAt;
+  final int photoCount;
 
   bool get isDeleted => deletedAt != null;
 }
@@ -43,4 +45,17 @@ class RemoteChangesPage {
 
   /// Kept verbatim and sent back as the next `updatedSince`.
   final String serverTime;
+}
+
+/// A photo as the server lists it. [url] is signed and expires.
+class RemotePhoto {
+  const RemotePhoto({
+    required this.id,
+    required this.url,
+    required this.takenAt,
+  });
+
+  final String id;
+  final Uri url;
+  final DateTime takenAt;
 }

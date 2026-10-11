@@ -1,13 +1,15 @@
 import 'package:flutter/material.dart';
 
 import '../theme/app_colors.dart';
+import 'pressable.dart';
 
-/// The glowing glass bubble in the centre of the bottom bar.
+/// The mint kinetic orb floating over the bottom dock. Breathes while a
+/// recording is running.
 class OrbButton extends StatefulWidget {
   const OrbButton({
     super.key,
     required this.onPressed,
-    this.size = 60,
+    this.size = 68,
     this.active = false,
     this.tooltip,
   });
@@ -31,8 +33,8 @@ class _OrbButtonState extends State<OrbButton>
   );
 
   @override
-  void initState() {
-    super.initState();
+  void didChangeDependencies() {
+    super.didChangeDependencies();
     _sync();
   }
 
@@ -43,7 +45,7 @@ class _OrbButtonState extends State<OrbButton>
   }
 
   void _sync() {
-    if (widget.active) {
+    if (widget.active && !MediaQuery.disableAnimationsOf(context)) {
       _pulse.repeat(reverse: true);
     } else {
       _pulse
@@ -60,8 +62,9 @@ class _OrbButtonState extends State<OrbButton>
 
   @override
   Widget build(BuildContext context) {
-    final orb = GestureDetector(
+    final orb = Pressable(
       onTap: widget.onPressed,
+      scale: 0.9,
       child: AnimatedBuilder(
         animation: _pulse,
         builder: (context, child) => Container(
@@ -69,33 +72,34 @@ class _OrbButtonState extends State<OrbButton>
           height: widget.size,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
+            gradient: const LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [AppColors.mintIce, AppColors.mint],
+            ),
             boxShadow: [
               BoxShadow(
-                color: (widget.active ? AppColors.lime : AppColors.glowTop)
-                    .withValues(alpha: 0.35 + 0.35 * _pulse.value),
-                blurRadius: 24 + 16 * _pulse.value,
-                spreadRadius: 1 + 4 * _pulse.value,
+                color: AppColors.mint.withValues(
+                  alpha: 0.40 + 0.30 * _pulse.value,
+                ),
+                blurRadius: 28 + 14 * _pulse.value,
+                spreadRadius: 4 * _pulse.value,
+                offset: const Offset(0, 8),
               ),
             ],
-            gradient: const RadialGradient(
-              center: Alignment(-0.35, -0.45),
-              radius: 0.95,
-              colors: [
-                Colors.white,
-                Color(0xFFE3F4EE),
-                Color(0xFF9CC9D6),
-                Color(0xFF5C8C7A),
-                Color(0xFFCFE59B),
-              ],
-              stops: [0, 0.18, 0.55, 0.85, 1],
-            ),
           ),
           child: child,
         ),
-        child: Icon(
-          widget.active ? Icons.graphic_eq : Icons.play_arrow_rounded,
-          color: const Color(0xCC1B2A24),
-          size: widget.size * 0.4,
+        child: AnimatedSwitcher(
+          duration: const Duration(milliseconds: 250),
+          transitionBuilder: (child, a) =>
+              ScaleTransition(scale: a, child: child),
+          child: Icon(
+            widget.active ? Icons.graphic_eq_rounded : Icons.play_arrow_rounded,
+            key: ValueKey(widget.active),
+            color: AppColors.onLime,
+            size: widget.size * 0.42,
+          ),
         ),
       ),
     );

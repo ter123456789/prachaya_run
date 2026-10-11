@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import '../../../../core/network/api_client.dart';
 import '../../../../core/network/token_store.dart';
@@ -6,6 +7,7 @@ import '../../domain/entities/activity.dart';
 import '../../domain/services/activity_sync.dart';
 import '../datasources/activity_local_data_source.dart';
 import '../datasources/activity_remote_data_source.dart';
+import '../datasources/photo_local_data_source.dart';
 
 /// Pushes local changes, then pulls the server's change feed
 /// (docs/api.md, "Pull sync"). One run at a time; a request made during a
@@ -14,15 +16,18 @@ class ActivitySyncEngine implements ActivitySync {
   ActivitySyncEngine({
     required ActivityLocalDataSource local,
     required ActivityRemoteDataSource remote,
+    required PhotoLocalDataSource photos,
     required TokenStore tokens,
   }) : _local = local,
        _remote = remote,
+       _photos = photos,
        _tokens = tokens;
 
   static const _epoch = '1970-01-01T00:00:00.000Z';
 
   final ActivityLocalDataSource _local;
   final ActivityRemoteDataSource _remote;
+  final PhotoLocalDataSource _photos;
   final TokenStore _tokens;
   final _changes = StreamController<void>.broadcast();
 
@@ -79,8 +84,10 @@ class ActivitySyncEngine implements ActivitySync {
     void mark(bool c) => changed |= c;
     try {
       await _local.claimUnowned(session.userId);
+      await _photos.claimUnowned(session.userId);
       await _push(session.userId, mark);
       await _pull(session.userId, mark);
+      await _syncPhotos(session.userId, mark);
       return SyncOutcome.synced;
     } on NetworkException {
       return SyncOutcome.offline;
@@ -123,5 +130,53 @@ class ActivitySyncEngine implements ActivitySync {
       serverTime = page.serverTime;
     } while (cursor != null);
     await _local.writeSyncValue(key, serverTime);
+  }
+
+  /// After activities: photo deletes, uploads, then lists of activities
+  /// whose photos changed elsewhere.
+  Future<void> _syncPhotos(
+    String userId,
+    void Function(bool changed) mark,
+  ) async {
+    await _photos.pruneOrphans();
+    for (final (activityId, photoId) in await _photos.pendingDeletes(userId)) {
+      await _remote.deletePhoto(activityId, photoId);
+      await _photos.purge(photoId);
+    }
+    for (final p in await _photos.pendingUploads(userId)) {
+      try {
+        final bytes = await File(p.path).readAsBytes();
+        await _remote.uploadPhoto(
+          activityId: p.activityId,
+          photoId: p.id,
+          bytes: bytes,
+          filename: '${p.id}.${imageExtension(bytes)}',
+          takenAt: p.takenAt,
+        );
+        await _photos.markUploaded(p.id);
+      } on ApiException catch (e) {
+        // Activity gone or file rejected: drop it rather than retry forever.
+        if (e.status == 404 || e.status == 413 || e.status == 415) {
+          await _photos.purge(p.id);
+          mark(true);
+        } else {
+          rethrow;
+        }
+      } on FileSystemException {
+        await _photos.purge(p.id);
+      }
+    }
+    for (final activityId in await _photos.staleActivities(userId)) {
+      final remote = await _remote.photos(activityId);
+      if (remote == null) continue;
+      mark(
+        await _photos.reconcile(
+          activityId,
+          remote,
+          ownerId: userId,
+          download: _remote.downloadFile,
+        ),
+      );
+    }
   }
 }

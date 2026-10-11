@@ -2,6 +2,7 @@ import '../../../../core/network/token_store.dart';
 import '../../domain/entities/activity.dart';
 import '../../domain/repositories/activity_repository.dart';
 import '../datasources/activity_local_data_source.dart';
+import '../datasources/photo_local_data_source.dart';
 import '../sync/activity_sync_engine.dart';
 
 /// Reads and writes go to SQLite first, so recording works offline;
@@ -14,12 +15,15 @@ class OfflineFirstActivityRepository implements ActivityRepository {
     this._local,
     this._sync,
     this._tokens, {
+    PhotoLocalDataSource? photos,
     DateTime Function() clock = DateTime.now,
-  }) : _clock = clock;
+  }) : _photos = photos,
+       _clock = clock;
 
   final ActivityLocalDataSource _local;
   final ActivitySyncEngine _sync;
   final TokenStore _tokens;
+  final PhotoLocalDataSource? _photos;
   final DateTime Function() _clock;
 
   Future<String?> _owner() async => (await _tokens.read())?.userId;
@@ -52,6 +56,8 @@ class OfflineFirstActivityRepository implements ActivityRepository {
     final state = await _local.syncState(id);
     if (state == null || !await _visible(state)) return;
     await _local.markDeleted(id, at: _clock());
+    // The server deletes an activity's photos with it.
+    await _photos?.removeAllOf(id);
     _sync.schedule();
   }
 

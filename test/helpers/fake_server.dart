@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
+import 'package:flutter_test/flutter_test.dart';
 
 /// In-memory stand-in for rinning_API that follows docs/api.md closely
 /// enough to exercise the client: auth tokens, upsert with last-write-wins,
@@ -11,6 +12,15 @@ class FakeServer {
   final Map<String, Map<String, Object?>> activities = {};
   final List<http.BaseRequest> requests = [];
   final List<Map<String, Object?>> uploads = [];
+
+  /// photoId → {activityId, takenAt, bytes}
+  final Map<String, Map<String, Object?>> photos = {};
+  Map<String, Object?> profile = {
+    'id': 'u1',
+    'email': 'a@b.co',
+    'displayName': null,
+    'weightKg': null,
+  };
   String validAccessToken = 'access-1';
   String validRefreshToken = 'refresh-1';
   bool offline = false;
@@ -27,6 +37,19 @@ class FakeServer {
     '_serverUpdatedAt': ++_clock,
   };
 
+  /// Adds a photo as if another device had uploaded it.
+  void seedPhoto(String activityId, String photoId, List<int> bytes) {
+    photos[photoId] = {
+      'activityId': activityId,
+      'takenAt': '2026-10-11T07:00:00.000Z',
+      'bytes': bytes,
+    };
+    activities[activityId]!['_serverUpdatedAt'] = ++_clock;
+  }
+
+  int _photoCount(String activityId) =>
+      photos.values.where((p) => p['activityId'] == activityId).length;
+
   void softDelete(String id) {
     activities[id]!['deletedAt'] = '2026-10-12T00:00:00.000Z';
     activities[id]!['_serverUpdatedAt'] = ++_clock;
@@ -36,6 +59,13 @@ class FakeServer {
     requests.add(request);
     if (offline) throw http.ClientException('offline');
     final path = request.url.path;
+
+    if (request.url.host == 'files.test') {
+      final photo = photos[path.substring(1)];
+      return photo == null
+          ? http.Response('', 404)
+          : http.Response.bytes(photo['bytes']! as List<int>, 200);
+    }
 
     if (path == '/auth/refresh') {
       final body = jsonDecode(request.body) as Map<String, Object?>;
@@ -54,6 +84,69 @@ class FakeServer {
     final auth = request.headers['Authorization'];
     if (auth != 'Bearer $validAccessToken') {
       return _error(401, 'token_expired');
+    }
+
+    if (path == '/me') {
+      if (request.method == 'PATCH') {
+        final body = jsonDecode(request.body) as Map<String, Object?>;
+        profile = {...profile, ...body};
+      }
+      return _json(200, profile);
+    }
+
+    if (path == '/challenges/current') {
+      return _json(200, {
+        'id': '2026-10',
+        'title': 'ความท้าทายประจำเดือนตุลาคม',
+        'badge': 'Night Owl',
+        'goalM': 20000,
+        'progressM': 0,
+        'startsAt': '2026-09-30T17:00:00.000Z',
+        'endsAt': '2026-10-31T17:00:00.000Z',
+        'completed': false,
+      });
+    }
+
+    final photoMatch = RegExp(
+      r'^/activities/([^/]+)/photos(?:/([^/]+))?$',
+    ).firstMatch(path);
+    if (photoMatch != null) {
+      final activityId = photoMatch.group(1)!;
+      final photoId = photoMatch.group(2);
+      final activity = activities[activityId];
+      if (request.method == 'DELETE') {
+        if (photos.remove(photoId) != null) {
+          activity?['_serverUpdatedAt'] = ++_clock;
+        }
+        return http.Response('', 204);
+      }
+      if (activity == null || activity['deletedAt'] != null) {
+        return _error(404, 'not_found');
+      }
+      if (request.method == 'PUT') {
+        expect(
+          request.headers['content-type'],
+          startsWith('multipart/form-data'),
+        );
+        photos[photoId!] = {
+          'activityId': activityId,
+          'takenAt': '2026-10-11T07:00:00.000Z',
+          'bytes': request.bodyBytes,
+        };
+        activity['_serverUpdatedAt'] = ++_clock;
+        return _json(200, {'id': photoId, 'activityId': activityId});
+      }
+      return _json(200, {
+        'items': [
+          for (final e in photos.entries)
+            if (e.value['activityId'] == activityId)
+              {
+                'id': e.key,
+                'url': 'https://files.test/${e.key}?sig=${++_clock}',
+                'takenAt': e.value['takenAt'],
+              },
+        ],
+      });
     }
 
     if (path == '/activities' && request.method == 'POST') {
@@ -93,7 +186,10 @@ class FakeServer {
     final id = path.split('/').last;
     final stored = activities[id];
     if (request.method == 'DELETE') {
-      if (stored != null) softDelete(id);
+      if (stored != null) {
+        softDelete(id);
+        photos.removeWhere((_, p) => p['activityId'] == id);
+      }
       return http.Response('', 204);
     }
     if (stored == null || stored['deletedAt'] != null) {
@@ -102,9 +198,10 @@ class FakeServer {
     return _json(200, {..._summary(stored), 'segments': stored['segments']});
   }
 
-  static Map<String, Object?> _summary(Map<String, Object?> a) => {
+  Map<String, Object?> _summary(Map<String, Object?> a) => {
     for (final e in a.entries)
       if (e.key != 'segments' && !e.key.startsWith('_')) e.key: e.value,
+    'photoCount': _photoCount(a['id']! as String),
   };
 
   static http.Response _json(int status, Object body) => http.Response(
