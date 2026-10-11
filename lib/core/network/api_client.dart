@@ -78,6 +78,7 @@ class ApiClient {
     final bytes = body == null ? null : utf8.encode(jsonEncode(body));
     final payload = bytes != null && gzipBody ? gzip.encode(bytes) : bytes;
 
+    String? usedToken;
     Future<http.Response> attempt() async {
       final headers = {
         'Accept': 'application/json',
@@ -89,6 +90,7 @@ class ApiClient {
         if (session == null) {
           throw const ApiException(401, 'unauthorized', 'signed out');
         }
+        usedToken = session.accessToken;
         headers['Authorization'] = 'Bearer ${session.accessToken}';
       }
       final request = http.Request(method, _uri(path, query))
@@ -99,7 +101,10 @@ class ApiClient {
 
     var response = await attempt();
     if (auth && _errorCode(response) == 'token_expired') {
-      if (!await _refresh()) {
+      // Another call may have refreshed meanwhile: retry with its token
+      // instead of refreshing again (the server rotates refresh tokens).
+      final current = (await _tokens.read())?.accessToken;
+      if (current == usedToken && !await _refresh()) {
         throw const ApiException(401, 'unauthorized', 'session ended');
       }
       response = await attempt();

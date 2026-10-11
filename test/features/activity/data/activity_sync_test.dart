@@ -184,6 +184,25 @@ void main() {
     },
   );
 
+  test('parallel expired calls refresh only once', () async {
+    final api = ApiClient(
+      baseUrl: 'http://api.test',
+      tokens: tokens,
+      httpClient: server.client,
+    );
+    server.validAccessToken = 'access-new';
+    await Future.wait([
+      api.get('/activities', query: {'updatedSince': '1970'}),
+      api.get('/activities', query: {'updatedSince': '1970'}),
+      api.get('/activities', query: {'updatedSince': '1970'}),
+    ]);
+    expect(
+      server.requests.where((r) => r.url.path == '/auth/refresh'),
+      hasLength(1),
+    );
+    expect(tokens.session!.accessToken, server.validAccessToken);
+  });
+
   test('a rejected refresh token signs out', () async {
     server.validAccessToken = 'access-new';
     server.validRefreshToken = 'something-else';
