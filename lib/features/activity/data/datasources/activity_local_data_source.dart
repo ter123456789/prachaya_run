@@ -123,6 +123,10 @@ class ActivityLocalDataSource {
     });
   }
 
+  /// Deletes everything an account owns on this device (account deleted).
+  Future<void> purgeOwner(String ownerId) =>
+      _db.delete(_activities, where: 'owner_id = ?', whereArgs: [ownerId]);
+
   /// Activities recorded while signed out (not yet claimed by an account).
   Future<int> unclaimedCount() async {
     final rows = await _db.rawQuery(

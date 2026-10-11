@@ -24,6 +24,7 @@ class FakeServer {
   String validAccessToken = 'access-1';
   String validRefreshToken = 'refresh-1';
   bool offline = false;
+  bool accountDeleted = false;
   int _clock = 0;
 
   late final client = MockClient(_handle);
@@ -87,6 +88,14 @@ class FakeServer {
     }
 
     if (path == '/me') {
+      if (request.method == 'DELETE') {
+        accountDeleted = true;
+        activities.clear();
+        photos.clear();
+        validAccessToken = 'revoked';
+        validRefreshToken = 'revoked';
+        return http.Response('', 204);
+      }
       if (request.method == 'PATCH') {
         final body = jsonDecode(request.body) as Map<String, Object?>;
         profile = {...profile, ...body};

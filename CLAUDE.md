@@ -54,6 +54,8 @@ Rules (enforced for every feature by `test/architecture_test.dart`):
 - DB v2 columns: `updated_at` (last-write-wins), `deleted_at` (tombstone until DELETE succeeds),
   `synced`, `has_track` (pulled activities download their track when first opened).
   The pull cursor (`serverTime`) is stored per user in `sync_state`.
+- Account deletion: `DELETE /me` (App Store requirement) from the account screen; 204 or 401 both count
+  as done; local rows/files of that owner are purged. The e2e test deletes its user at the end.
 - Tokens live in `flutter_secure_storage`; `ApiClient` refreshes single-flight on `token_expired`
   and signs out (AuthCubit listens) when the server says `unauthorized`.
 

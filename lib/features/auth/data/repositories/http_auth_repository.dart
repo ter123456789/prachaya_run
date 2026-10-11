@@ -6,12 +6,19 @@ import '../../domain/entities/auth_user.dart';
 import '../../domain/repositories/auth_repository.dart';
 
 class HttpAuthRepository implements AuthRepository {
-  HttpAuthRepository(this._api, this._tokens) {
+  HttpAuthRepository(
+    this._api,
+    this._tokens, {
+    Future<void> Function(String userId)? onAccountDeleted,
+  }) : _onAccountDeleted = onAccountDeleted {
     _api.sessionEnded.listen((_) => _changes.add(null));
   }
 
   final ApiClient _api;
   final TokenStore _tokens;
+
+  /// Removes the account's rows and files from this device.
+  final Future<void> Function(String userId)? _onAccountDeleted;
   final _changes = StreamController<AuthUser?>.broadcast();
 
   @override
@@ -46,6 +53,25 @@ class HttpAuthRepository implements AuthRepository {
     } catch (_) {
       // Signed out locally either way; the token expires on its own.
     }
+  }
+
+  @override
+  Future<void> deleteAccount() async {
+    final session = await _tokens.read();
+    if (session == null) return;
+    try {
+      await _api.delete('/me');
+    } on NetworkException {
+      throw const AuthException(AuthError.network);
+    } on ApiException catch (e) {
+      // Already gone (e.g. deleted on another device): finish locally.
+      if (e.status != 401 && e.status != 404) {
+        throw const AuthException(AuthError.unknown);
+      }
+    }
+    await _onAccountDeleted?.call(session.userId);
+    await _tokens.clear();
+    _changes.add(null);
   }
 
   Future<AuthUser> _signIn(String path, String email, String password) async {

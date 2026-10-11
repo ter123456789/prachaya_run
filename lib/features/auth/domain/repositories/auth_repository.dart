@@ -33,4 +33,9 @@ abstract interface class AuthRepository {
 
   /// Always signs out locally, even when the server cannot be reached.
   Future<void> logout();
+
+  /// Permanently deletes the account and its data on the server, then its
+  /// data on this device. Throws [AuthException] (nothing is deleted when
+  /// the server cannot be reached).
+  Future<void> deleteAccount();
 }

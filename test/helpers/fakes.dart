@@ -132,6 +132,14 @@ class FakeAuthRepository implements AuthRepository {
 
   @override
   Future<void> logout() async => user = null;
+
+  bool deleted = false;
+
+  @override
+  Future<void> deleteAccount() async {
+    deleted = true;
+    user = null;
+  }
 }
 
 class FakeDebugTools implements DebugTools {

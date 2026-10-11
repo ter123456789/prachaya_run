@@ -229,5 +229,22 @@ void main() {
     await tester.tap(find.byTooltip('ประวัติ'));
     await waitFor(tester, find.text('ประวัติกิจกรรม'));
     await shot(tester, '09_history');
+
+    // --- Delete the account (cleans the server; App Store requirement) ---
+    await tester.tap(find.byTooltip('บัญชี').last);
+    await waitFor(tester, find.text('ลบบัญชี'));
+    await tester.ensureVisible(find.text('ลบบัญชี'));
+    await wait(tester, 800);
+    await shot(tester, '10_account_before_delete');
+    await tester.tap(find.text('ลบบัญชี'));
+    await waitFor(tester, find.text('ลบบัญชีถาวร?'));
+    await tester.tap(find.text('ลบบัญชี').last);
+    await waitFor(tester, find.text('ซิงก์กิจกรรมข้ามเครื่อง'));
+    final gone = await http.post(
+      Uri.parse('$apiBaseUrl/auth/login'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'email': email, 'password': password}),
+    );
+    expect(gone.statusCode, 401);
   });
 }

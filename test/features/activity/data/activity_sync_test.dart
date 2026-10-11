@@ -42,6 +42,7 @@ void main() {
   late ActivitySyncEngine engine;
   late OfflineFirstActivityRepository repository;
   late DateTime now;
+  late ActivityLocalDataSource local;
   late Directory photoDir;
   late PhotoLocalDataSource photos;
 
@@ -65,7 +66,7 @@ void main() {
       tokens: tokens,
       httpClient: server.client,
     );
-    final local = ActivityLocalDataSource(db);
+    local = ActivityLocalDataSource(db);
     photoDir = Directory.systemTemp.createTempSync('photos');
     addTearDown(() => photoDir.deleteSync(recursive: true));
     photos = PhotoLocalDataSource(db, photoDir);
@@ -359,5 +360,16 @@ void main() {
       expect(File(photo.localPath!).existsSync(), isFalse);
       expect(await photoRepo.photosOf(_id), isEmpty);
     });
+  });
+
+  test('purgeOwner removes only that account\'s activities', () async {
+    await repository.save(_activity());
+    await engine.sync(); // claimed by u1
+    tokens.session = null;
+    await repository.save(
+      _activity(id: '0a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d'),
+    );
+    await local.purgeOwner('u1');
+    expect(await repository.getAll(), hasLength(1)); // the unclaimed one
   });
 }

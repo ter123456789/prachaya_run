@@ -459,6 +459,57 @@ class _SignedInState extends State<_SignedIn> {
     if (confirmed ?? false) await cubit.logout();
   }
 
+  Future<void> _confirmDelete(BuildContext context) async {
+    final cubit = context.read<AuthCubit>();
+    final messenger = ScaffoldMessenger.of(context);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        icon: const Icon(
+          Icons.warning_amber_rounded,
+          color: AppColors.negative,
+        ),
+        title: const Text('ลบบัญชีถาวร?'),
+        content: const Text(
+          'บัญชี กิจกรรม และรูปทั้งหมดจะถูกลบจากเซิร์ฟเวอร์และเครื่องนี้ '
+          'กู้คืนไม่ได้',
+          style: AppText.body,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('ยกเลิก'),
+          ),
+          TextButton(
+            style: TextButton.styleFrom(foregroundColor: AppColors.negative),
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('ลบบัญชี'),
+          ),
+        ],
+      ),
+    );
+    if (!(confirmed ?? false)) return;
+    await cubit.deleteAccount();
+    final failure = cubit.state.failure;
+    if (failure != null) {
+      messenger
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: Text(
+              failure == AuthFailure.network
+                  ? 'ต้องเชื่อมต่ออินเทอร์เน็ตเพื่อลบบัญชี'
+                  : 'ลบบัญชีไม่สำเร็จ ลองอีกครั้ง',
+            ),
+          ),
+        );
+    } else {
+      messenger
+        ..hideCurrentSnackBar()
+        ..showSnackBar(const SnackBar(content: Text('ลบบัญชีแล้ว')));
+    }
+  }
+
   void _save() {
     FocusScope.of(context).unfocus();
     final weight = double.tryParse(_weight.text.trim().replaceAll(',', '.'));
@@ -656,6 +707,13 @@ class _SignedInState extends State<_SignedIn> {
               onPressed: auth.busy ? null : () => _confirmLogout(context),
               icon: const Icon(Icons.logout_rounded, color: AppColors.negative),
               label: const Text('ออกจากระบบ'),
+            ),
+            const SizedBox(height: 4),
+            TextButton.icon(
+              style: TextButton.styleFrom(foregroundColor: AppColors.negative),
+              onPressed: auth.busy ? null : () => _confirmDelete(context),
+              icon: const Icon(Icons.person_remove_outlined),
+              label: const Text('ลบบัญชี'),
             ),
           ],
         );

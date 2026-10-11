@@ -1,4 +1,5 @@
 import 'package:bloc_test/bloc_test.dart';
+import 'package:flutter_test/flutter_test.dart';
 import 'package:prachaya_run/features/auth/domain/entities/auth_user.dart';
 import 'package:prachaya_run/features/auth/domain/repositories/auth_repository.dart';
 import 'package:prachaya_run/features/auth/presentation/bloc/auth_cubit.dart';
@@ -68,5 +69,18 @@ void main() {
     seed: () => const AuthState(status: AuthStatus.signedIn, user: user),
     act: (_) => repo.endSession(),
     expect: () => [const AuthState(status: AuthStatus.signedOut)],
+  );
+
+  final deleting = FakeAuthRepository(user: user);
+  blocTest<AuthCubit, AuthState>(
+    'deleteAccount signs out',
+    build: () => AuthCubit(deleting),
+    seed: () => const AuthState(status: AuthStatus.signedIn, user: user),
+    act: (cubit) => cubit.deleteAccount(),
+    expect: () => [
+      const AuthState(status: AuthStatus.signedIn, user: user, busy: true),
+      const AuthState(status: AuthStatus.signedOut),
+    ],
+    verify: (_) => expect(deleting.deleted, isTrue),
   );
 }

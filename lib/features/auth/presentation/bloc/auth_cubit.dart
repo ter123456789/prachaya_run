@@ -61,6 +61,24 @@ class AuthCubit extends Cubit<AuthState> {
     _setUser(null);
   }
 
+  Future<void> deleteAccount() async {
+    emit(AuthState(status: state.status, user: state.user, busy: true));
+    try {
+      await _repository.deleteAccount();
+      _setUser(null);
+    } on AuthException catch (e) {
+      emit(
+        AuthState(
+          status: state.status,
+          user: state.user,
+          failure: e.error == AuthError.network
+              ? AuthFailure.network
+              : AuthFailure.unknown,
+        ),
+      );
+    }
+  }
+
   Future<void> _submit(
     String email,
     String password,

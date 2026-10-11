@@ -82,6 +82,49 @@ void main() {
     expect(changes, [null]);
     expect(requests.single.url.path, '/auth/logout');
   });
+
+  test('deleteAccount calls DELETE /me, cleans up and signs out', () async {
+    String? purged;
+    requests = [];
+    tokens = MemoryTokenStore(StoredSessionFixture.session);
+    final api = ApiClient(
+      baseUrl: 'http://api.test',
+      tokens: tokens,
+      httpClient: MockClient((r) async {
+        requests.add(r);
+        return http.Response('', 204);
+      }),
+    );
+    final r = HttpAuthRepository(
+      api,
+      tokens,
+      onAccountDeleted: (id) async => purged = id,
+    );
+    final changes = <Object?>[];
+    r.userChanges.listen(changes.add);
+
+    await r.deleteAccount();
+    await Future<void>.delayed(Duration.zero);
+
+    expect(requests.single.method, 'DELETE');
+    expect(requests.single.url.path, '/me');
+    expect(requests.single.headers['Authorization'], 'Bearer a');
+    expect(purged, 'u1');
+    expect(tokens.session, isNull);
+    expect(changes, [null]);
+  });
+
+  test('deleteAccount offline keeps the account and reports network', () async {
+    final r = repo((_) => throw http.ClientException('offline'));
+    await tokens.write(StoredSessionFixture.session);
+    await expectLater(
+      r.deleteAccount(),
+      throwsA(
+        isA<AuthException>().having((e) => e.error, 'error', AuthError.network),
+      ),
+    );
+    expect(tokens.session, isNotNull);
+  });
 }
 
 abstract final class StoredSessionFixture {

@@ -70,7 +70,14 @@ Future<void> main() async {
     PrachayaRunApp(
       activityRepository: activities,
       activitySync: sync,
-      authRepository: HttpAuthRepository(api, tokens),
+      authRepository: HttpAuthRepository(
+        api,
+        tokens,
+        onAccountDeleted: (userId) async {
+          await local.purgeOwner(userId);
+          await photos.pruneOrphans();
+        },
+      ),
       profileRepository: HttpProfileRepository(api, tokens, kv),
       photoRepository: OfflineFirstPhotoRepository(photos, sync, tokens),
       challengeRepository: HttpChallengeRepository(api, tokens, kv),
