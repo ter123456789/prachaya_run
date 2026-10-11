@@ -47,7 +47,10 @@ void main() {
                 'package:image_picker',
                 'package:gal',
                 'package:share_plus',
-              ].any(uri.startsWith))
+                'package:http',
+                'package:flutter_secure_storage',
+              ].any(uri.startsWith) ||
+              uri.contains('core/network/'))
             '$file -> $uri',
       ];
       expect(violations, isEmpty);

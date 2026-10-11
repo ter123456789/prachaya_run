@@ -57,7 +57,7 @@ class HistoryPage extends StatelessWidget {
                           },
                         )
                       : RefreshIndicator(
-                          onRefresh: context.refreshActivities,
+                          onRefresh: context.syncActivities,
                           child: ListView(
                             padding: const EdgeInsets.fromLTRB(20, 8, 20, 140),
                             children: _withMonthHeaders(items),

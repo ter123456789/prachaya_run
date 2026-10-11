@@ -3,10 +3,12 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/formatters.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/widgets/circle_icon_button.dart';
 import '../../../../core/widgets/fade_slide_in.dart';
 import '../../../../core/widgets/glass_card.dart';
 import '../../../../core/widgets/glass_stat_tile.dart';
 import '../../../../core/widgets/glow_background.dart';
+import '../../../auth/presentation/pages/account_page.dart';
 import '../../domain/entities/activity.dart';
 import '../../domain/entities/route_shape.dart';
 import '../../domain/entities/weekly_stats.dart';
@@ -39,29 +41,41 @@ class DashboardPage extends StatelessWidget {
         child: BlocBuilder<DashboardCubit, DashboardState>(
           builder: (context, state) {
             return RefreshIndicator(
-              onRefresh: context.refreshActivities,
+              onRefresh: context.syncActivities,
               child: ListView(
                 padding: const EdgeInsets.fromLTRB(20, 16, 20, 140),
                 children: [
                   // Sections rise in one after another on first show.
                   FadeSlideIn(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                    child: Row(
                       children: [
-                        Text(
-                          'สวัสดี${timeOfDayPeriod(now)}',
-                          style: const TextStyle(
-                            fontSize: 15,
-                            color: AppColors.textSecondary,
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'สวัสดี${timeOfDayPeriod(now)}',
+                                style: const TextStyle(
+                                  fontSize: 15,
+                                  color: AppColors.textSecondary,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              const Text(
+                                'พร้อมออกไปวิ่งหรือยัง?',
+                                style: TextStyle(
+                                  fontSize: 26,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                        const SizedBox(height: 4),
-                        const Text(
-                          'พร้อมออกไปวิ่งหรือยัง?',
-                          style: TextStyle(
-                            fontSize: 26,
-                            fontWeight: FontWeight.w500,
-                          ),
+                        CircleIconButton(
+                          icon: Icons.person_outline_rounded,
+                          tooltip: 'บัญชี',
+                          onPressed: () =>
+                              Navigator.of(context).push(AccountPage.route()),
                         ),
                       ],
                     ),

@@ -16,6 +16,8 @@ void main() {
     await tester.pumpWidget(
       PrachayaRunApp(
         activityRepository: repo,
+        activitySync: FakeActivitySync(),
+        authRepository: FakeAuthRepository(),
         locationTracker: FakeLocationTracker(),
         photoSource: FakePhotoSource(),
         imageSink: FakeImageSink(),

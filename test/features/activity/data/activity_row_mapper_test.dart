@@ -20,7 +20,11 @@ void main() {
       ],
     );
 
-    final row = ActivityRowMapper.activityToRow(activity);
+    final row = ActivityRowMapper.activityToRow(
+      activity,
+      updatedAt: t0,
+      ownerId: null,
+    );
     final pointRows = ActivityRowMapper.pointsToRows(activity).toList();
     final restored = ActivityRowMapper.activityFromRows(row, pointRows);
 

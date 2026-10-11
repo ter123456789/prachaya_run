@@ -5,7 +5,10 @@ import 'package:prachaya_run/features/activity/domain/entities/activity.dart';
 import 'package:prachaya_run/features/activity/domain/entities/activity_type.dart';
 import 'package:prachaya_run/features/activity/domain/entities/track_point.dart';
 import 'package:prachaya_run/features/activity/domain/repositories/activity_repository.dart';
+import 'package:prachaya_run/features/activity/domain/services/activity_sync.dart';
 import 'package:prachaya_run/features/activity/domain/services/location_tracker.dart';
+import 'package:prachaya_run/features/auth/domain/entities/auth_user.dart';
+import 'package:prachaya_run/features/auth/domain/repositories/auth_repository.dart';
 import 'package:prachaya_run/features/photo_share/domain/services/image_sink.dart';
 import 'package:prachaya_run/features/photo_share/domain/services/photo_source.dart';
 
@@ -62,6 +65,62 @@ class InMemoryActivityRepository implements ActivityRepository {
 
   @override
   Future<void> delete(String id) async => store.remove(id);
+}
+
+class FakeActivitySync implements ActivitySync {
+  final changesController = StreamController<void>.broadcast();
+  SyncOutcome next = SyncOutcome.synced;
+  int calls = 0;
+
+  @override
+  Stream<void> get changes => changesController.stream;
+
+  @override
+  Future<SyncOutcome> sync() async {
+    calls++;
+    return next;
+  }
+}
+
+class FakeAuthRepository implements AuthRepository {
+  FakeAuthRepository({this.user});
+
+  AuthUser? user;
+  AuthError? failNext;
+  final _changes = StreamController<AuthUser?>.broadcast();
+
+  void endSession() {
+    user = null;
+    _changes.add(null);
+  }
+
+  @override
+  Stream<AuthUser?> get userChanges => _changes.stream;
+
+  @override
+  Future<AuthUser?> currentUser() async => user;
+
+  @override
+  Future<AuthUser> login({required String email, required String password}) =>
+      _signIn(email);
+
+  @override
+  Future<AuthUser> register({
+    required String email,
+    required String password,
+  }) => _signIn(email);
+
+  Future<AuthUser> _signIn(String email) async {
+    final error = failNext;
+    if (error != null) {
+      failNext = null;
+      throw AuthException(error);
+    }
+    return user = AuthUser(id: 'u1', email: email);
+  }
+
+  @override
+  Future<void> logout() async => user = null;
 }
 
 class FakePhotoSource implements PhotoSource {

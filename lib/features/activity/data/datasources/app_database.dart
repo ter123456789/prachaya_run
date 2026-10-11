@@ -1,46 +1,114 @@
 import 'package:path/path.dart' as p;
 import 'package:sqflite/sqflite.dart';
 
+import '../../domain/services/uuid.dart';
+
 abstract final class AppDatabase {
   static const activitiesTable = 'activities';
   static const trackPointsTable = 'track_points';
+  static const syncStateTable = 'sync_state';
+  static const version = 2;
 
-  static Future<Database> open() async {
-    final dir = await getDatabasesPath();
-    return openDatabase(
-      p.join(dir, 'prachaya_run.db'),
-      version: 1,
-      onConfigure: (db) => db.execute('PRAGMA foreign_keys = ON'),
-      onCreate: (db, version) async {
-        await db.execute('''
-          CREATE TABLE $activitiesTable (
-            id TEXT PRIMARY KEY,
-            type TEXT NOT NULL,
-            title TEXT NOT NULL,
-            started_at INTEGER NOT NULL,
-            ended_at INTEGER NOT NULL,
-            moving_time_ms INTEGER NOT NULL,
-            distance_m REAL NOT NULL,
-            elevation_gain_m REAL NOT NULL
-          )''');
-        await db.execute('''
-          CREATE TABLE $trackPointsTable (
-            activity_id TEXT NOT NULL
-              REFERENCES $activitiesTable(id) ON DELETE CASCADE,
-            segment INTEGER NOT NULL,
-            seq INTEGER NOT NULL,
-            lat REAL NOT NULL,
-            lng REAL NOT NULL,
-            altitude REAL,
-            accuracy REAL,
-            timestamp INTEGER NOT NULL,
-            PRIMARY KEY (activity_id, segment, seq)
-          )''');
-        await db.execute(
-          'CREATE INDEX idx_activities_started_at '
-          'ON $activitiesTable(started_at DESC)',
-        );
-      },
+  /// [factory] and [path] let tests use an in-memory FFI database.
+  static Future<Database> open({DatabaseFactory? factory, String? path}) async {
+    final dbFactory = factory ?? databaseFactory;
+    return dbFactory.openDatabase(
+      path ?? p.join(await dbFactory.getDatabasesPath(), 'prachaya_run.db'),
+      options: OpenDatabaseOptions(
+        version: version,
+        onConfigure: (db) => db.execute('PRAGMA foreign_keys = ON'),
+        onCreate: (db, version) async {
+          await _createV1(db);
+          await _upgradeToV2(db);
+        },
+        onUpgrade: (db, oldVersion, newVersion) async {
+          if (oldVersion < 2) await _upgradeToV2(db);
+        },
+      ),
     );
+  }
+
+  static Future<void> _createV1(Database db) async {
+    await db.execute('''
+      CREATE TABLE $activitiesTable (
+        id TEXT PRIMARY KEY,
+        type TEXT NOT NULL,
+        title TEXT NOT NULL,
+        started_at INTEGER NOT NULL,
+        ended_at INTEGER NOT NULL,
+        moving_time_ms INTEGER NOT NULL,
+        distance_m REAL NOT NULL,
+        elevation_gain_m REAL NOT NULL
+      )''');
+    await db.execute('''
+      CREATE TABLE $trackPointsTable (
+        activity_id TEXT NOT NULL
+          REFERENCES $activitiesTable(id) ON DELETE CASCADE,
+        segment INTEGER NOT NULL,
+        seq INTEGER NOT NULL,
+        lat REAL NOT NULL,
+        lng REAL NOT NULL,
+        altitude REAL,
+        accuracy REAL,
+        timestamp INTEGER NOT NULL,
+        PRIMARY KEY (activity_id, segment, seq)
+      )''');
+    await db.execute(
+      'CREATE INDEX idx_activities_started_at '
+      'ON $activitiesTable(started_at DESC)',
+    );
+  }
+
+  /// v2 adds server sync:
+  /// - `updated_at`: last local edit (ms), used for last-write-wins.
+  /// - `deleted_at`: tombstone kept until the delete reaches the server.
+  /// - `synced`: 0 while the row has changes the server has not seen.
+  /// - `has_track`: 0 for activities pulled from another device whose GPS
+  ///   track is downloaded only when opened.
+  /// - `owner_id`: the account the activity belongs to. NULL for activities
+  ///   recorded while signed out; the next account to sign in claims them.
+  /// Old ids (timestamps) become UUIDs, as the server requires.
+  static Future<void> _upgradeToV2(Database db) async {
+    await db.execute(
+      'ALTER TABLE $activitiesTable '
+      'ADD COLUMN updated_at INTEGER NOT NULL DEFAULT 0',
+    );
+    await db.execute(
+      'ALTER TABLE $activitiesTable ADD COLUMN deleted_at INTEGER',
+    );
+    await db.execute(
+      'ALTER TABLE $activitiesTable '
+      'ADD COLUMN synced INTEGER NOT NULL DEFAULT 0',
+    );
+    await db.execute(
+      'ALTER TABLE $activitiesTable '
+      'ADD COLUMN has_track INTEGER NOT NULL DEFAULT 1',
+    );
+    await db.execute('ALTER TABLE $activitiesTable ADD COLUMN owner_id TEXT');
+    await db.execute('UPDATE $activitiesTable SET updated_at = ended_at');
+    await db.execute('''
+      CREATE TABLE $syncStateTable (
+        key TEXT PRIMARY KEY,
+        value TEXT NOT NULL
+      )''');
+
+    final uuidPattern = RegExp(
+      r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$',
+    );
+    final rows = await db.query(activitiesTable);
+    for (final row in rows) {
+      final oldId = row['id']! as String;
+      if (uuidPattern.hasMatch(oldId)) continue;
+      final newId = uuidV4();
+      // Copy, repoint the track, then drop the old row (FKs stay valid).
+      await db.insert(activitiesTable, {...row, 'id': newId});
+      await db.update(
+        trackPointsTable,
+        {'activity_id': newId},
+        where: 'activity_id = ?',
+        whereArgs: [oldId],
+      );
+      await db.delete(activitiesTable, where: 'id = ?', whereArgs: [oldId]);
+    }
   }
 }

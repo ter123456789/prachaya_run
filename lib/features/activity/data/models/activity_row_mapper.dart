@@ -1,12 +1,18 @@
 import '../../domain/entities/activity.dart';
 import '../../domain/entities/activity_type.dart';
 import '../../domain/entities/track_point.dart';
+import 'remote_activity_summary.dart';
 
 typedef Row = Map<String, Object?>;
 
 /// Converts between domain entities and SQLite rows.
 abstract final class ActivityRowMapper {
-  static Row activityToRow(Activity a) => {
+  /// A row for an activity recorded on this device, waiting to be synced.
+  static Row activityToRow(
+    Activity a, {
+    required DateTime updatedAt,
+    required String? ownerId,
+  }) => {
     'id': a.id,
     'type': a.type.name,
     'title': a.title,
@@ -15,6 +21,33 @@ abstract final class ActivityRowMapper {
     'moving_time_ms': a.movingTime.inMilliseconds,
     'distance_m': a.distanceMeters,
     'elevation_gain_m': a.elevationGainMeters,
+    'updated_at': updatedAt.millisecondsSinceEpoch,
+    'deleted_at': null,
+    'synced': 0,
+    'has_track': 1,
+    'owner_id': ownerId,
+  };
+
+  /// A row matching the server's copy. [hasTrack] says whether the GPS
+  /// track is stored locally too.
+  static Row remoteSummaryToRow(
+    RemoteActivitySummary s, {
+    required bool hasTrack,
+    required String ownerId,
+  }) => {
+    'id': s.id,
+    'type': s.type.name,
+    'title': s.title,
+    'started_at': s.startedAt.millisecondsSinceEpoch,
+    'ended_at': s.endedAt.millisecondsSinceEpoch,
+    'moving_time_ms': s.movingTime.inMilliseconds,
+    'distance_m': s.distanceMeters,
+    'elevation_gain_m': s.elevationGainMeters,
+    'updated_at': s.updatedAt.millisecondsSinceEpoch,
+    'deleted_at': null,
+    'synced': 1,
+    'has_track': hasTrack ? 1 : 0,
+    'owner_id': ownerId,
   };
 
   static Iterable<Row> pointsToRows(Activity a) sync* {
