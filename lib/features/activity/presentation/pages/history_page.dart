@@ -3,14 +3,27 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/formatters.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_text.dart';
+import '../../../../core/widgets/app_top_bar.dart';
+import '../../../../core/widgets/edge_fade.dart';
+import '../../../../core/widgets/fade_slide_in.dart';
 import '../../../../core/widgets/glass_card.dart';
 import '../../../../core/widgets/glow_background.dart';
 import '../../../../core/widgets/pill_tabs.dart';
+import '../../../../core/widgets/shimmer.dart';
+import '../../../../core/widgets/status_pill.dart';
+import '../../../auth/presentation/bloc/auth_cubit.dart';
+import '../../../auth/presentation/bloc/profile_cubit.dart';
+import '../../../auth/presentation/pages/account_page.dart';
 import '../../domain/entities/activity.dart';
 import '../../domain/entities/activity_type.dart';
+import '../../domain/entities/monthly_summary.dart';
+import '../../domain/services/activity_sync.dart';
+import '../../domain/services/calories.dart';
 import '../activity_labels.dart';
 import '../activity_refresh.dart';
 import '../bloc/history/history_cubit.dart';
+import '../bloc/sync/sync_cubit.dart';
 import 'activity_detail_page.dart';
 
 class HistoryPage extends StatelessWidget {
@@ -18,51 +31,62 @@ class HistoryPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final signedIn = context.select(
+      (AuthCubit c) => c.state.status == AuthStatus.signedIn,
+    );
     return GlowBackground(
       glowHeight: 220,
       child: SafeArea(
         bottom: false,
         child: BlocBuilder<HistoryCubit, HistoryState>(
           builder: (context, state) {
-            final items = state.visible;
+            final months = MonthlySummary.group(state.visible);
             return Column(
               children: [
-                const SizedBox(height: 16),
-                const Text(
-                  'ประวัติกิจกรรม',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+                  child: AppTopBar(
+                    title: 'ประวัติกิจกรรม',
+                    actions: [
+                      AvatarButton(
+                        signedIn: signedIn,
+                        onPressed: () =>
+                            Navigator.of(context).push(AccountPage.route()),
+                      ),
+                    ],
+                  ),
                 ),
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
                   child: PillTabs<ActivityType?>(
                     items: const [null, ...ActivityType.values],
                     selected: state.filter,
                     labelOf: (t) => t?.label ?? 'ทั้งหมด',
+                    iconOf: (t) => t?.icon ?? Icons.apps_rounded,
                     onChanged: context.read<HistoryCubit>().setFilter,
                   ),
                 ),
                 Expanded(
-                  child: items.isEmpty
-                      ? Center(
-                          child: switch (state.status) {
-                            HistoryStatus.loading =>
-                              const CircularProgressIndicator(),
-                            HistoryStatus.failure => const Text(
-                              'โหลดข้อมูลไม่สำเร็จ',
-                            ),
-                            HistoryStatus.loaded => const Text(
-                              'ยังไม่มีกิจกรรม ออกไปวิ่งกัน!',
-                              style: TextStyle(color: AppColors.textSecondary),
-                            ),
-                          },
-                        )
-                      : RefreshIndicator(
-                          onRefresh: context.syncActivities,
-                          child: ListView(
-                            padding: const EdgeInsets.fromLTRB(20, 8, 20, 140),
-                            children: _withMonthHeaders(items),
-                          ),
+                  child: EdgeFade(
+                    child: AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 320),
+                      switchInCurve: Curves.easeOutCubic,
+                      transitionBuilder: (child, a) => FadeTransition(
+                        opacity: a,
+                        child: SlideTransition(
+                          position: Tween(
+                            begin: const Offset(0, 0.03),
+                            end: Offset.zero,
+                          ).animate(a),
+                          child: child,
                         ),
+                      ),
+                      child: KeyedSubtree(
+                        key: ValueKey((state.filter, state.status)),
+                        child: _body(context, state, months),
+                      ),
+                    ),
+                  ),
                 ),
               ],
             );
@@ -72,102 +96,300 @@ class HistoryPage extends StatelessWidget {
     );
   }
 
-  static List<Widget> _withMonthHeaders(List<ActivitySummary> items) {
-    final widgets = <Widget>[];
-    String? currentMonth;
-    for (final a in items) {
-      final month = formatMonthYear(a.startedAt);
-      if (month != currentMonth) {
-        currentMonth = month;
-        widgets.add(
-          Padding(
-            padding: EdgeInsets.only(top: widgets.isEmpty ? 4 : 20, bottom: 10),
-            child: Text(
-              month,
-              style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w500),
-            ),
-          ),
-        );
-      }
-      widgets.add(
-        Padding(
-          padding: const EdgeInsets.only(bottom: 10),
-          child: _ActivityRow(a),
+  Widget _body(
+    BuildContext context,
+    HistoryState state,
+    List<MonthlySummary> months,
+  ) {
+    if (months.isEmpty) {
+      return switch (state.status) {
+        HistoryStatus.loading => ListView(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+          children: const [
+            Shimmer(height: 150, radius: 28),
+            SizedBox(height: 14),
+            Shimmer(height: 160, radius: 28),
+            SizedBox(height: 14),
+            Shimmer(height: 160, radius: 28),
+          ],
         ),
-      );
+        HistoryStatus.failure => const Center(
+          child: Text('โหลดข้อมูลไม่สำเร็จ', style: AppText.body),
+        ),
+        HistoryStatus.loaded => Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 72,
+                height: 72,
+                decoration: const BoxDecoration(
+                  color: AppColors.limeSoft,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.directions_run_rounded,
+                  color: AppColors.lime,
+                  size: 36,
+                ),
+              ),
+              const SizedBox(height: 14),
+              const Text('ยังไม่มีกิจกรรม ออกไปวิ่งกัน!', style: AppText.body),
+            ],
+          ),
+        ),
+      };
     }
-    return widgets;
+    var index = 0;
+    return RefreshIndicator(
+      color: AppColors.onLime,
+      backgroundColor: AppColors.lime,
+      onRefresh: context.syncActivities,
+      child: ListView(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 150),
+        children: [
+          for (final month in months) ...[
+            FadeSlideIn(
+              delay: Duration(milliseconds: 40 * (index++).clamp(0, 8)),
+              child: _MonthCard(month),
+            ),
+            const SizedBox(height: 14),
+            for (final a in month.activities) ...[
+              FadeSlideIn(
+                delay: Duration(milliseconds: 40 * (index++).clamp(0, 8)),
+                child: _ActivityCard(a),
+              ),
+              const SizedBox(height: 14),
+            ],
+          ],
+          const Center(child: _SyncBadge()),
+        ],
+      ),
+    );
   }
 }
 
-class _ActivityRow extends StatelessWidget {
-  const _ActivityRow(this.summary);
+class _MonthCard extends StatelessWidget {
+  const _MonthCard(this.month);
+
+  final MonthlySummary month;
+
+  @override
+  Widget build(BuildContext context) {
+    final weight = context.select((ProfileCubit c) => c.state.weightKg);
+    final kcal = month.activities.fold<double>(
+      0,
+      (s, a) =>
+          s +
+          estimateCalories(
+            type: a.type,
+            distanceMeters: a.distanceMeters,
+            movingTime: a.movingTime,
+            weightKg: weight,
+          ),
+    );
+    final hours = month.movingTime.inHours;
+    final minutes = month.movingTime.inMinutes.remainder(60);
+    return GlassCard(
+      radius: 28,
+      strong: true,
+      padding: const EdgeInsets.all(18),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              const PulseDot(color: AppColors.lime, size: 9),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  formatMonthYear(month.month),
+                  style: AppText.headlineMd,
+                ),
+              ),
+              StatusPill(text: '${month.count} กิจกรรม', color: AppColors.lime),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              _MonthStat(
+                label: 'ระยะทางรวม',
+                value: (month.distanceMeters / 1000).toStringAsFixed(1),
+                unit: 'กม.',
+              ),
+              const SizedBox(width: 8),
+              _MonthStat(
+                label: 'เวลารวม',
+                value: '$hours:${minutes.toString().padLeft(2, '0')}',
+                unit: 'ชม.',
+              ),
+              const SizedBox(width: 8),
+              _MonthStat(
+                label: 'แคลอรี่',
+                value: _thousands(kcal.round()),
+                unit: 'kcal',
+                color: AppColors.secondary,
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  static String _thousands(int n) => n.toString().replaceAllMapped(
+    RegExp(r'\B(?=(\d{3})+(?!\d))'),
+    (_) => ',',
+  );
+}
+
+class _MonthStat extends StatelessWidget {
+  const _MonthStat({
+    required this.label,
+    required this.value,
+    required this.unit,
+    this.color,
+  });
+
+  final String label;
+  final String value;
+  final String unit;
+  final Color? color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(12, 10, 8, 10),
+        decoration: BoxDecoration(
+          color: AppColors.glassFill,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(label, style: AppText.caption),
+            const SizedBox(height: 2),
+            FittedBox(
+              child: Text.rich(
+                TextSpan(
+                  children: [
+                    TextSpan(
+                      text: value,
+                      style: AppText.metricMd.copyWith(color: color),
+                    ),
+                    TextSpan(text: ' $unit', style: AppText.caption),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ActivityCard extends StatelessWidget {
+  const _ActivityCard(this.summary);
 
   final ActivitySummary summary;
 
   @override
   Widget build(BuildContext context) {
     final speed = summary.averageSpeedMps;
+    final hike = summary.type == ActivityType.hike;
     return GlassCard(
+      radius: 28,
       padding: const EdgeInsets.all(14),
       onTap: () async {
         await Navigator.of(context).push(ActivityDetailPage.route(summary.id));
         if (context.mounted) await context.refreshActivities();
       },
-      child: Row(
+      child: Column(
         children: [
-          Container(
-            width: 64,
-            height: 64,
-            decoration: BoxDecoration(
-              color: AppColors.glassFill,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: AppColors.glassBorder),
-            ),
-            child: Icon(summary.type.icon, color: AppColors.lime, size: 30),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  summary.title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w500,
-                  ),
+          Row(
+            children: [
+              Container(
+                width: 60,
+                height: 60,
+                decoration: BoxDecoration(
+                  color: hike
+                      ? AppColors.secondary.withValues(alpha: 0.16)
+                      : AppColors.limeSoft,
+                  borderRadius: BorderRadius.circular(16),
                 ),
-                const SizedBox(height: 4),
-                Wrap(
-                  spacing: 10,
-                  runSpacing: 2,
+                child: Icon(
+                  summary.type.icon,
+                  color: hike ? AppColors.secondary : AppColors.lime,
+                  size: 30,
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _Metric(
-                      Icons.speed,
-                      summary.type.usesPace
-                          ? '${formatPace(speed)} /กม.'
-                          : '${formatSpeedKmh(speed)} กม./ชม.',
+                    Text(
+                      summary.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppText.headlineSm,
                     ),
-                    _Metric(
-                      Icons.route,
-                      '${formatDistanceKm(summary.distanceMeters)} กม.',
-                    ),
-                    _Metric(
-                      Icons.timer_outlined,
-                      formatDuration(summary.movingTime),
+                    const SizedBox(height: 2),
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.calendar_today_outlined,
+                          size: 13,
+                          color: AppColors.textMuted,
+                        ),
+                        const SizedBox(width: 6),
+                        Flexible(
+                          child: Text(
+                            formatDateTime(summary.startedAt),
+                            style: AppText.monoLabel,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  formatDateTime(summary.startedAt),
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: AppColors.textMuted,
-                  ),
+              ),
+              const Icon(
+                Icons.chevron_right_rounded,
+                color: AppColors.textSecondary,
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.symmetric(vertical: 10),
+            decoration: BoxDecoration(
+              color: AppColors.background.withValues(alpha: 0.55),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Row(
+              children: [
+                _Metric(
+                  icon: Icons.speed_rounded,
+                  label: summary.type.usesPace ? 'เพซ' : 'ความเร็ว',
+                  value: summary.type.usesPace
+                      ? formatPace(speed)
+                      : formatSpeedKmh(speed),
+                  unit: summary.type.usesPace ? '/กม.' : 'กม./ชม.',
+                ),
+                _Metric(
+                  icon: Icons.route_rounded,
+                  label: 'ระยะทาง',
+                  value: formatDistanceKm(summary.distanceMeters),
+                  unit: 'กม.',
+                ),
+                _Metric(
+                  icon: Icons.timer_outlined,
+                  label: 'เวลา',
+                  value: formatDuration(summary.movingTime),
                 ),
               ],
             ),
@@ -179,23 +401,77 @@ class _ActivityRow extends StatelessWidget {
 }
 
 class _Metric extends StatelessWidget {
-  const _Metric(this.icon, this.text);
+  const _Metric({
+    required this.icon,
+    required this.label,
+    required this.value,
+    this.unit,
+  });
 
   final IconData icon;
-  final String text;
+  final String label;
+  final String value;
+  final String? unit;
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icon, size: 14, color: AppColors.lime),
-        const SizedBox(width: 3),
-        Text(
-          text,
-          style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
-        ),
-      ],
+    return Expanded(
+      child: Column(
+        children: [
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 13, color: AppColors.lime),
+              const SizedBox(width: 4),
+              Text(label, style: AppText.caption),
+            ],
+          ),
+          const SizedBox(height: 2),
+          FittedBox(
+            child: Text.rich(
+              TextSpan(
+                children: [
+                  TextSpan(text: value, style: AppText.metricMd),
+                  if (unit != null)
+                    TextSpan(text: ' $unit', style: AppText.caption),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
     );
+  }
+}
+
+class _SyncBadge extends StatelessWidget {
+  const _SyncBadge();
+
+  @override
+  Widget build(BuildContext context) {
+    final signedIn = context.select(
+      (AuthCubit c) => c.state.status == AuthStatus.signedIn,
+    );
+    final sync = context.watch<SyncCubit>().state;
+    final (icon, text, color) = !signedIn
+        ? (
+            Icons.phone_iphone_rounded,
+            'บันทึกในเครื่อง · เข้าสู่ระบบเพื่อซิงก์',
+            AppColors.textSecondary,
+          )
+        : sync.syncing
+        ? (Icons.sync_rounded, 'กำลังซิงก์…', AppColors.textSecondary)
+        : sync.lastOutcome == SyncOutcome.offline
+        ? (
+            Icons.cloud_off_outlined,
+            'ออฟไลน์ · จะซิงก์เมื่อต่อเน็ตได้',
+            AppColors.negative,
+          )
+        : (
+            Icons.verified_outlined,
+            'ข้อมูลทั้งหมดซิงค์กับคลาวด์แล้ว',
+            AppColors.secondary,
+          );
+    return StatusPill(text: text, icon: icon, color: color);
   }
 }

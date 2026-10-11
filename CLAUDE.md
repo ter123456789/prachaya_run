@@ -49,25 +49,29 @@ Rules (enforced for every feature by `test/architecture_test.dart`):
   Activity ids are client UUIDs (`uuidV4`). An account is optional; signed out, nothing is sent.
 - Rows are scoped by `owner_id`: an account sees its own rows plus unclaimed ones (recorded signed
   out, `owner_id IS NULL`), which its next sync claims. Other accounts' rows stay on disk, hidden.
+- DB v3 adds `activity_photos` (offline-first photos, files named by photo id under app docs `photos/`),
+  `activities.photo_count/photos_stale`, and a `kv` JSON cache (profile, challenge, weather).
 - DB v2 columns: `updated_at` (last-write-wins), `deleted_at` (tombstone until DELETE succeeds),
   `synced`, `has_track` (pulled activities download their track when first opened).
   The pull cursor (`serverTime`) is stored per user in `sync_state`.
 - Tokens live in `flutter_secure_storage`; `ApiClient` refreshes single-flight on `token_expired`
   and signs out (AuthCubit listens) when the server says `unauthorized`.
 
-## UI
-- Dark theme modelled on the "Strivo" running-app reference: near-black canvas, lime accent
-  (`AppColors.lime`), frosted glass cards, top lime glow, pill tabs, centre orb button.
-- Tokens in `core/theme/app_colors.dart`; theme in `core/theme/app_theme.dart`; shared widgets in
-  `core/widgets/` (GlassCard, GlassStatTile, GlowBackground, CircleIconButton, PillTabs, OrbButton,
-  FadeSlideIn, FadeIndexedStack).
-- Font: Prompt (Thai + Latin), bundled in `assets/fonts/` (OFL).
-- Launch: native splash is plain `#0C0D0B` (`flutter_native_splash` config in pubspec), then the
-  animated `core/splash/SplashPage` (icon pop + ripple, route line draws, ~1.7 s) fades into
-  `HomePage`. App icon from `assets/icon/app_icon.png` (`flutter_launcher_icons`).
-- Motion: Android routes use `FadeForwardsPageTransitionsBuilder` (iOS keeps Cupertino swipe-back);
-  home tabs cross-fade via `FadeIndexedStack` (keeps state, inactive tab goes offstage);
-  dashboard sections stagger in with `FadeSlideIn`. All honour OS "remove animations".
+## UI ("Obsidian Kinetic" redesign)
+- Design source: Stitch export (DESIGN.md + 6 screens). Obsidian canvas, kinetic lime (`AppColors.lime`),
+  mint orb gradient, frosted glass, no reds (warnings/destructive use amber `AppColors.negative`).
+- Tokens: `core/theme/app_colors.dart`; type scale `core/theme/app_text.dart` (Prompt for Thai/body,
+  JetBrains Mono for telemetry — Be Vietnam Pro from the spec has no Thai glyphs, so Prompt replaces it);
+  theme in `core/theme/app_theme.dart` (inputs radius 18, 56 px pill buttons, switches, sheets).
+- Shared widgets in `core/widgets/`: GlassCard (tappable cards spring via Pressable), BentoStat,
+  CountUpText, ProgressRing, PillTabs (sliding lime thumb), AppChip, StatusPill/PulseDot, AppTopBar,
+  AvatarButton, SectionHeader, FloatingDock + OrbButton, Shimmer, EdgeFade, FadeSlideIn, FadeIndexedStack.
+  `features/activity/presentation/widgets/route_canvas.dart` draws the self-animating luminescent route.
+- Not in the app on purpose: heart rate (no sensor; detail shows estimated calories instead),
+  notification bell, place names.
+- Motion: entrance staggers, count-ups, ring/bar sweeps, sliding tabs, press springs, haptics. Every
+  looping animation stops under OS "remove animations" (widget tests run with it on so pumpAndSettle ends).
+- Font files in `assets/fonts/` (OFL). Launch: native splash `#0C0D0B`, then `core/splash/SplashPage`.
 - Maps use CARTO dark tiles (attribution: OpenStreetMap contributors, CARTO).
 
 ## State management
@@ -77,7 +81,9 @@ Rules (enforced for every feature by `test/architecture_test.dart`):
 - `RecordState.failure` is one-shot: `copyWith` clears it unless passed again.
 - Photo export: the page rasterizes its `RepaintBoundary` at 1080 px wide and hands the PNG
   render callback to the cubit. The cut-out checkerboard is preview-only (outside the boundary).
-- Share image options: layouts (classic Strava-style default, glass, full, statsOnly, routeOnly),
+- Weather: Open-Meteo direct (`OpenMeteoWeatherService`, no key), cached in `kv`.
+- Calories: `estimateCalories` (MET) with the profile weight (`ProfileCubit`), default 65 kg.
+- Share image options: logo toggle, (classic Strava-style default, glass, full, statsOnly, routeOnly),
   1–4 stats (distance, avg speed, pace, time, elevation), TH/EN labels. Background is the photo
   (or a branded opaque card without one), or "พื้นใส" cut-out: only text + route, transparent PNG,
   no shadows or glass tiles; it hides (not deletes) a chosen photo. `_render` precaches the photo first
@@ -87,3 +93,5 @@ Rules (enforced for every feature by `test/architecture_test.dart`):
 - `flutter analyze` — must be clean
 - `flutter test` — domain, mapper, bloc (`bloc_test`), widget and architecture tests; DB migration and
   sync tests run on `sqflite_common_ffi` against an in-memory fake of the API (`test/helpers/fake_server.dart`)
+- End to end on a simulator against the real backend (screenshots → `build/e2e_screenshots/`):
+  `flutter drive --driver=test_driver/integration_test.dart --target=integration_test/app_e2e_test.dart -d <id>`

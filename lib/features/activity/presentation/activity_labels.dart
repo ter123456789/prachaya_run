@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/formatters.dart';
+import '../domain/entities/activity_insights.dart';
 import '../domain/entities/activity_type.dart';
+import '../domain/entities/weather_report.dart';
 
 extension ActivityTypeLabels on ActivityType {
   String get label => switch (this) {
@@ -22,4 +24,67 @@ extension ActivityTypeLabels on ActivityType {
 
 String defaultActivityTitle(ActivityType type, DateTime startedAt) {
   return '${type.label}${timeOfDayPeriod(startedAt)}';
+}
+
+/// Pace in the share/telemetry style: `5'01"`.
+String formatPaceQuote(double speedMps) {
+  final p = formatPace(speedMps);
+  if (!p.contains(':')) return p;
+  final parts = p.split(':');
+  return "${parts[0]}'${parts[1]}\"";
+}
+
+extension EffortLabels on Effort {
+  String tag(ActivityType type) {
+    final sport = switch (type) {
+      ActivityType.run => 'Run',
+      ActivityType.ride => 'Ride',
+      ActivityType.hike => 'Hike',
+    };
+    return switch (this) {
+      Effort.easy => 'Easy $sport',
+      Effort.steady => 'Steady $sport',
+      Effort.tempo => 'Tempo $sport',
+    };
+  }
+}
+
+extension WeatherLabels on WeatherReport {
+  String get description => switch (kind) {
+    WeatherKind.clear => isNight ? 'ฟ้าโปร่ง' : 'แดดดี',
+    WeatherKind.cloudy => 'มีเมฆบางส่วน',
+    WeatherKind.fog => 'มีหมอก',
+    WeatherKind.drizzle => 'ฝนปรอยๆ',
+    WeatherKind.rain => 'ฝนตก',
+    WeatherKind.storm => 'พายุฝนฟ้าคะนอง',
+  };
+
+  IconData get icon => switch (kind) {
+    WeatherKind.clear =>
+      isNight ? Icons.nightlight_round : Icons.wb_sunny_outlined,
+    WeatherKind.cloudy => Icons.cloud_outlined,
+    WeatherKind.fog => Icons.foggy,
+    WeatherKind.drizzle || WeatherKind.rain => Icons.water_drop_outlined,
+    WeatherKind.storm => Icons.thunderstorm_outlined,
+  };
+
+  String get temperatureLabel => '${temperatureC.round()}°C';
+}
+
+extension RunAdviceLabels on RunAdvice {
+  String get headline => switch (this) {
+    RunAdvice.great => 'อากาศดี เหมาะออกไปวิ่ง',
+    RunAdvice.hot => 'ค่อนข้างร้อน ดื่มน้ำให้พอ',
+    RunAdvice.veryHot => 'ร้อนจัด เลี่ยงการวิ่งหนัก',
+    RunAdvice.wet => 'ฝนตก ระวังพื้นลื่น',
+    RunAdvice.windy => 'ลมแรง เลือกเส้นทางที่บังลม',
+  };
+
+  String get hint => switch (this) {
+    RunAdvice.great => 'เหมาะกับการวิ่งโซน 2 สบายๆ',
+    RunAdvice.hot => 'ลดเพซลงเล็กน้อย พักบ่อยขึ้น',
+    RunAdvice.veryHot => 'ออกช่วงเช้ามืดหรือหลังพระอาทิตย์ตก',
+    RunAdvice.wet => 'ใส่รองเท้าที่ยึดเกาะดี',
+    RunAdvice.windy => 'วิ่งทวนลมช่วงแรก กลับตามลม',
+  };
 }

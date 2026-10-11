@@ -58,6 +58,7 @@ final class PhotoOverlayState extends Equatable {
     this.stats = defaultStats,
     this.background = OverlayBackground.card,
     this.language = OverlayLanguage.th,
+    this.showLogo = true,
     this.status = PhotoOverlayStatus.editing,
     this.failure,
   });
@@ -80,6 +81,9 @@ final class PhotoOverlayState extends Equatable {
   final List<OverlayStat> stats;
   final OverlayBackground background;
   final OverlayLanguage language;
+
+  /// The PRACHAYA RUN wordmark.
+  final bool showLogo;
   final PhotoOverlayStatus status;
   final PhotoOverlayFailure? failure;
 
@@ -98,6 +102,7 @@ final class PhotoOverlayState extends Equatable {
     List<OverlayStat>? stats,
     OverlayBackground? background,
     OverlayLanguage? language,
+    bool? showLogo,
     PhotoOverlayStatus? status,
     PhotoOverlayFailure? failure,
   }) => PhotoOverlayState(
@@ -108,6 +113,7 @@ final class PhotoOverlayState extends Equatable {
     stats: stats ?? this.stats,
     background: background ?? this.background,
     language: language ?? this.language,
+    showLogo: showLogo ?? this.showLogo,
     status: status ?? this.status,
     failure: failure,
   );
@@ -123,6 +129,7 @@ final class PhotoOverlayState extends Equatable {
     stats,
     background,
     language,
+    showLogo,
     status,
     failure,
   ];
@@ -194,6 +201,9 @@ class PhotoOverlayCubit extends Cubit<PhotoOverlayState> {
     }
     emit(state.copyWith(stats: next, status: PhotoOverlayStatus.editing));
   }
+
+  void setShowLogo(bool show) =>
+      emit(state.copyWith(showLogo: show, status: PhotoOverlayStatus.editing));
 
   void setLanguage(OverlayLanguage language) => emit(
     state.copyWith(language: language, status: PhotoOverlayStatus.editing),

@@ -3,20 +3,31 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/formatters.dart';
 import '../../../../core/theme/app_colors.dart';
-import '../../../../core/widgets/circle_icon_button.dart';
+import '../../../../core/theme/app_text.dart';
+import '../../../../core/widgets/app_top_bar.dart';
+import '../../../../core/widgets/bento_stat.dart';
+import '../../../../core/widgets/count_up_text.dart';
+import '../../../../core/widgets/edge_fade.dart';
 import '../../../../core/widgets/fade_slide_in.dart';
 import '../../../../core/widgets/glass_card.dart';
-import '../../../../core/widgets/glass_stat_tile.dart';
 import '../../../../core/widgets/glow_background.dart';
+import '../../../../core/widgets/progress_ring.dart';
+import '../../../../core/widgets/status_pill.dart';
+import '../../../auth/presentation/bloc/auth_cubit.dart';
+import '../../../auth/presentation/bloc/profile_cubit.dart';
 import '../../../auth/presentation/pages/account_page.dart';
 import '../../domain/entities/activity.dart';
+import '../../domain/entities/activity_insights.dart';
+import '../../domain/entities/monthly_challenge.dart';
 import '../../domain/entities/route_shape.dart';
+import '../../domain/entities/weather_report.dart';
 import '../../domain/entities/weekly_stats.dart';
+import '../../domain/services/calories.dart';
 import '../activity_labels.dart';
 import '../activity_refresh.dart';
 import '../bloc/dashboard/dashboard_cubit.dart';
 import '../bloc/record/record_bloc.dart';
-import '../widgets/route_painter.dart';
+import '../widgets/route_canvas.dart';
 import 'activity_detail_page.dart';
 
 /// Weekly distance goal shown on the ring. Fixed for now.
@@ -35,87 +46,104 @@ class DashboardPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final now = DateTime.now();
+    final signedIn = context.select(
+      (AuthCubit c) => c.state.status == AuthStatus.signedIn,
+    );
     return GlowBackground(
       child: SafeArea(
         bottom: false,
         child: BlocBuilder<DashboardCubit, DashboardState>(
           builder: (context, state) {
-            return RefreshIndicator(
-              onRefresh: context.syncActivities,
-              child: ListView(
-                padding: const EdgeInsets.fromLTRB(20, 16, 20, 140),
-                children: [
-                  // Sections rise in one after another on first show.
-                  FadeSlideIn(
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'สวัสดี${timeOfDayPeriod(now)}',
-                                style: const TextStyle(
-                                  fontSize: 15,
-                                  color: AppColors.textSecondary,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              const Text(
-                                'พร้อมออกไปวิ่งหรือยัง?',
-                                style: TextStyle(
-                                  fontSize: 26,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        CircleIconButton(
-                          icon: Icons.person_outline_rounded,
-                          tooltip: 'บัญชี',
+            return EdgeFade(
+              child: RefreshIndicator(
+                color: AppColors.onLime,
+                backgroundColor: AppColors.lime,
+                onRefresh: context.syncActivities,
+                child: ListView(
+                  padding: const EdgeInsets.fromLTRB(16, 4, 16, 140),
+                  children: [
+                    AppTopBar(
+                      title: 'หน้าหลัก',
+                      actions: [
+                        AvatarButton(
+                          signedIn: signedIn,
                           onPressed: () =>
                               Navigator.of(context).push(AccountPage.route()),
                         ),
                       ],
                     ),
-                  ),
-                  _RecordingBanner(onTap: onStart),
-                  const SizedBox(height: 28),
-                  FadeSlideIn(
-                    delay: const Duration(milliseconds: 90),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        const _SectionTitle('ความคืบหน้าสัปดาห์นี้'),
-                        const SizedBox(height: 12),
-                        _ProgressGrid(week: state.week),
-                      ],
+                    const SizedBox(height: 12),
+                    FadeSlideIn(child: _Greeting(now: now)),
+                    _RecordingBanner(onTap: onStart),
+                    const SizedBox(height: 24),
+                    FadeSlideIn(
+                      delay: const Duration(milliseconds: 80),
+                      child: SectionHeader(
+                        'ความคืบหน้าสัปดาห์นี้',
+                        icon: Icons.show_chart_rounded,
+                        action: state.week == null
+                            ? null
+                            : StatusPill(
+                                text: 'สัปดาห์ที่ ${state.week!.weekNumber}',
+                              ),
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 28),
-                  FadeSlideIn(
-                    delay: const Duration(milliseconds: 180),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        _SectionTitle(
-                          'กิจกรรมล่าสุด',
-                          action: TextButton(
-                            onPressed: onSeeAll,
-                            child: const Text('ดูทั้งหมด'),
+                    const SizedBox(height: 12),
+                    FadeSlideIn(
+                      delay: const Duration(milliseconds: 140),
+                      child: _WeekBento(week: state.week),
+                    ),
+                    AnimatedSize(
+                      duration: const Duration(milliseconds: 400),
+                      curve: Curves.easeOutCubic,
+                      child: state.weather == null
+                          ? const SizedBox(width: double.infinity)
+                          : Padding(
+                              padding: const EdgeInsets.only(top: 12),
+                              child: FadeSlideIn(
+                                child: _WeatherCard(state.weather!, now: now),
+                              ),
+                            ),
+                    ),
+                    const SizedBox(height: 28),
+                    FadeSlideIn(
+                      delay: const Duration(milliseconds: 200),
+                      child: SectionHeader(
+                        'กิจกรรมล่าสุด',
+                        icon: Icons.history_rounded,
+                        action: TextButton.icon(
+                          onPressed: onSeeAll,
+                          iconAlignment: IconAlignment.end,
+                          icon: const Icon(
+                            Icons.arrow_forward_rounded,
+                            size: 18,
                           ),
+                          label: const Text('ดูทั้งหมด'),
                         ),
-                        const SizedBox(height: 8),
-                        _LatestActivity(
-                          activity: state.latest,
-                          now: now,
-                          onStart: onStart,
-                        ),
-                      ],
+                      ),
                     ),
-                  ),
-                ],
+                    const SizedBox(height: 12),
+                    FadeSlideIn(
+                      delay: const Duration(milliseconds: 260),
+                      child: _LatestActivity(
+                        activity: state.latest,
+                        insights: state.latestInsights,
+                        now: now,
+                        onStart: onStart,
+                      ),
+                    ),
+                    if (state.challenge != null) ...[
+                      const SizedBox(height: 16),
+                      FadeSlideIn(
+                        delay: const Duration(milliseconds: 320),
+                        child: _ChallengeCard(
+                          challenge: state.challenge!,
+                          meters: state.challengeMeters,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
               ),
             );
           },
@@ -125,23 +153,31 @@ class DashboardPage extends StatelessWidget {
   }
 }
 
-class _SectionTitle extends StatelessWidget {
-  const _SectionTitle(this.text, {this.action});
+class _Greeting extends StatelessWidget {
+  const _Greeting({required this.now});
 
-  final String text;
-  final Widget? action;
+  final DateTime now;
 
   @override
   Widget build(BuildContext context) {
-    return Row(
+    final name = context.select(
+      (ProfileCubit c) => c.state.profile?.displayName,
+    );
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Expanded(
-          child: Text(
-            text,
-            style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w500),
-          ),
+        Row(
+          children: [
+            const PulseDot(color: AppColors.lime, size: 7),
+            const SizedBox(width: 8),
+            Text(
+              'สวัสดี${timeOfDayPeriod(now)}${name == null ? '' : ' $name'}',
+              style: AppText.label,
+            ),
+          ],
         ),
-        ?action,
+        const SizedBox(height: 4),
+        const Text('พร้อมออกไปวิ่งหรือยัง?', style: AppText.headlineLg),
       ],
     );
   }
@@ -160,198 +196,240 @@ class _RecordingBanner extends StatelessWidget {
           p.movingTime.inSeconds != c.movingTime.inSeconds ||
           p.status != c.status,
       builder: (context, state) {
-        if (!state.isActive) return const SizedBox.shrink();
-        final paused = state.status == RecordStatus.paused;
-        return Padding(
-          padding: const EdgeInsets.only(top: 16),
-          child: GlassCard(
-            strong: true,
-            onTap: onTap,
-            child: Row(
-              children: [
-                Icon(
-                  paused ? Icons.pause_circle : Icons.fiber_manual_record,
-                  color: AppColors.lime,
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    '${paused ? 'หยุดชั่วคราว' : 'กำลังบันทึก'}${state.type.label}'
-                    ' · ${formatDuration(state.movingTime)}'
-                    ' · ${formatDistanceKm(state.distanceMeters)} กม.',
+        return AnimatedSize(
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOutCubic,
+          child: !state.isActive
+              ? const SizedBox(width: double.infinity)
+              : Padding(
+                  padding: const EdgeInsets.only(top: 16),
+                  child: GlassCard(
+                    strong: true,
+                    onTap: onTap,
+                    child: Row(
+                      children: [
+                        PulseDot(
+                          color: state.status == RecordStatus.paused
+                              ? AppColors.negative
+                              : AppColors.lime,
+                          size: 10,
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            '${state.status == RecordStatus.paused ? 'หยุดชั่วคราว' : 'กำลังบันทึก'}'
+                            '${state.type.label}',
+                          ),
+                        ),
+                        Text(
+                          '${formatDuration(state.movingTime)} · '
+                          '${formatDistanceKm(state.distanceMeters)} กม.',
+                          style: AppText.metricSm,
+                        ),
+                        const Icon(Icons.chevron_right_rounded),
+                      ],
+                    ),
                   ),
                 ),
-                const Icon(Icons.chevron_right),
-              ],
-            ),
-          ),
         );
       },
     );
   }
 }
 
-class _ProgressGrid extends StatelessWidget {
-  const _ProgressGrid({required this.week});
+class _WeekBento extends StatelessWidget {
+  const _WeekBento({required this.week});
 
   final WeeklyStats? week;
 
   @override
   Widget build(BuildContext context) {
     final w = week;
-    final change = w?.distanceChangeMeters ?? 0;
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    final distance = w?.distanceMeters ?? 0;
+    final progress = w?.progressToward(kWeeklyGoalMeters) ?? 0;
+    final today = w?.todayDistanceMeters ?? 0;
+    final time = w?.movingTime ?? Duration.zero;
+    return Column(
       children: [
-        Expanded(
-          child: Column(
-            children: [
-              _GoalRingCard(week: w),
-              const SizedBox(height: 10),
-              Row(
-                children: [
-                  Expanded(
-                    child: GlassStatTile(
-                      icon: Icons.timer_outlined,
-                      label: 'เวลา',
-                      value: formatDuration(w?.movingTime ?? Duration.zero),
-                      valueSize: 17,
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: GlassStatTile(
-                      icon: Icons.flag_outlined,
-                      label: 'กิจกรรม',
-                      value: '${w?.activityCount ?? 0}',
-                      unit: 'ครั้ง',
-                      valueSize: 17,
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: Column(
+        IntrinsicHeight(
+          child: Row(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              GlassStatTile(
-                icon: Icons.route,
-                label: 'ระยะทาง',
-                value: formatDistanceKm(w?.distanceMeters ?? 0),
-                unit: 'กม.',
-                footer: w == null || w.previousWeekDistanceMeters == 0
-                    ? null
-                    : _Delta(change),
+              Expanded(
+                child: GlassCard(
+                  radius: 24,
+                  padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('เป้าหมายรายสัปดาห์', style: AppText.label),
+                      const SizedBox(height: 12),
+                      Center(
+                        child: ProgressRing(
+                          progress: progress,
+                          size: 120,
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              CountUpText(
+                                progress * 100,
+                                format: (v) => '${v.round()}%',
+                                style: AppText.metricLg,
+                              ),
+                              const Text(
+                                'COMPLETED',
+                                style: AppText.monoLabelSm,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const Spacer(),
+                      const SizedBox(height: 12),
+                      Center(
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 8,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppColors.background,
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                          child: FittedBox(
+                            child: Text.rich(
+                              TextSpan(
+                                children: [
+                                  TextSpan(
+                                    text: formatDistanceKm(distance),
+                                    style: AppText.metricSm,
+                                  ),
+                                  TextSpan(
+                                    text:
+                                        ' จาก ${(kWeeklyGoalMeters / 1000).round()} กม.',
+                                    style: AppText.label,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ),
-              const SizedBox(height: 10),
-              GlassStatTile(
-                icon: Icons.terrain_outlined,
-                label: 'ขึ้นสะสม',
-                value: '${(w?.elevationGainMeters ?? 0).round()}',
-                unit: 'ม.',
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  children: [
+                    BentoStat(
+                      label: 'ระยะทาง',
+                      icon: Icons.route_rounded,
+                      value: formatDistanceKm(distance),
+                      numeric: distance / 1000,
+                      format: (v) => v.toStringAsFixed(2),
+                      unit: 'กม.',
+                      footer: today > 0
+                          ? '+${formatDistanceKm(today)} วันนี้'
+                          : 'ยังไม่ได้ออกวันนี้',
+                      footerIcon: today > 0 ? Icons.trending_up_rounded : null,
+                      footerColor: today > 0 ? AppColors.lime : null,
+                    ),
+                    const SizedBox(height: 12),
+                    BentoStat(
+                      label: 'ขึ้นสะสม',
+                      icon: Icons.landscape_outlined,
+                      value: '${(w?.elevationGainMeters ?? 0).round()}',
+                      numeric: w?.elevationGainMeters ?? 0,
+                      format: (v) => '${v.round()}',
+                      unit: 'ม.',
+                      footer:
+                          'ทางชันเฉลี่ย ${(w?.averageGradePercent ?? 0).toStringAsFixed(1)}%',
+                    ),
+                  ],
+                ),
               ),
             ],
           ),
         ),
-      ],
-    );
-  }
-}
-
-class _Delta extends StatelessWidget {
-  const _Delta(this.meters);
-
-  final double meters;
-
-  @override
-  Widget build(BuildContext context) {
-    final up = meters >= 0;
-    final color = up ? AppColors.positive : AppColors.negative;
-    return Row(
-      children: [
-        Icon(
-          up ? Icons.arrow_upward : Icons.arrow_downward,
-          size: 14,
-          color: color,
-        ),
-        const SizedBox(width: 2),
-        Flexible(
-          child: Text.rich(
-            TextSpan(
-              children: [
-                TextSpan(
-                  text: '${up ? '+' : ''}${formatDistanceKm(meters)}',
-                  style: TextStyle(color: color),
-                ),
-                const TextSpan(text: ' จากสัปดาห์ก่อน'),
-              ],
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: BentoStat(
+                label: 'เวลา',
+                icon: Icons.timer_outlined,
+                value: formatDuration(time),
+                numeric: time.inSeconds.toDouble(),
+                format: (v) => formatDuration(Duration(seconds: v.round())),
+                footer: time.inHours > 0
+                    ? 'ชั่วโมง:นาที:วินาที'
+                    : 'นาที:วินาที',
+              ),
             ),
-            style: const TextStyle(
-              fontSize: 11,
-              color: AppColors.textSecondary,
+            const SizedBox(width: 12),
+            Expanded(
+              child: BentoStat(
+                label: 'กิจกรรม',
+                icon: Icons.flag_outlined,
+                value: '${w?.activityCount ?? 0}',
+                numeric: (w?.activityCount ?? 0).toDouble(),
+                format: (v) => '${v.round()}',
+                unit: 'ครั้ง',
+                footer: 'สัปดาห์ปัจจุบัน',
+              ),
             ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
+          ],
         ),
       ],
     );
   }
 }
 
-class _GoalRingCard extends StatelessWidget {
-  const _GoalRingCard({required this.week});
+class _WeatherCard extends StatelessWidget {
+  const _WeatherCard(this.weather, {required this.now});
 
-  final WeeklyStats? week;
+  final WeatherReport weather;
+  final DateTime now;
 
   @override
   Widget build(BuildContext context) {
-    final progress = week?.progressToward(kWeeklyGoalMeters) ?? 0;
+    final advice = adviseRun(weather);
+    final when = now.hour >= 17 || now.hour < 5 ? 'คืนนี้' : 'ตอนนี้';
     return GlassCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      padding: const EdgeInsets.all(14),
+      child: Row(
         children: [
-          const Text('เป้าหมายรายสัปดาห์', style: TextStyle(fontSize: 14)),
-          const SizedBox(height: 12),
-          Center(
-            child: SizedBox.square(
-              dimension: 96,
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  CircularProgressIndicator(
-                    value: progress,
-                    strokeWidth: 9,
-                    strokeCap: StrokeCap.round,
-                    backgroundColor: AppColors.glassFillStrong,
-                  ),
-                  Center(
-                    child: Text(
-                      '${(progress * 100).round()}%',
-                      style: const TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+          Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              color: AppColors.limeSoft,
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Icon(
+              advice == RunAdvice.great ? Icons.bolt_rounded : weather.icon,
+              color: AppColors.lime,
             ),
           ),
-          const SizedBox(height: 12),
-          FittedBox(
-            fit: BoxFit.scaleDown,
-            child: Text(
-              '${formatDistanceKm(week?.distanceMeters ?? 0)} จาก '
-              '${formatDistanceKm(kWeeklyGoalMeters).replaceAll('.00', '')} กม.',
-              style: const TextStyle(
-                fontSize: 12,
-                color: AppColors.textSecondary,
-              ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '$when${weather.description} ${weather.temperatureLabel}',
+                  style: AppText.bodyLg.copyWith(fontWeight: FontWeight.w500),
+                ),
+                Text(
+                  'ลม ${weather.windKmh.round()} กม./ชม. · ${advice.hint}',
+                  style: AppText.caption.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
+                  maxLines: 2,
+                ),
+              ],
             ),
           ),
         ],
@@ -363,11 +441,13 @@ class _GoalRingCard extends StatelessWidget {
 class _LatestActivity extends StatelessWidget {
   const _LatestActivity({
     required this.activity,
+    required this.insights,
     required this.now,
     required this.onStart,
   });
 
   final Activity? activity;
+  final ActivityInsights? insights;
   final DateTime now;
   final VoidCallback onStart;
 
@@ -377,98 +457,282 @@ class _LatestActivity extends StatelessWidget {
     if (a == null) {
       return GlassCard(
         onTap: onStart,
-        padding: const EdgeInsets.all(24),
+        padding: const EdgeInsets.all(28),
         child: const Column(
           children: [
-            Icon(Icons.directions_run, color: AppColors.lime, size: 36),
-            SizedBox(height: 8),
-            Text('ยังไม่มีกิจกรรม'),
-            Text(
-              'แตะปุ่มกลมตรงกลางเพื่อเริ่มบันทึก',
-              style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
-            ),
+            Icon(Icons.directions_run_rounded, color: AppColors.lime, size: 40),
+            SizedBox(height: 10),
+            Text('ยังไม่มีกิจกรรม', style: AppText.headlineSm),
+            SizedBox(height: 2),
+            Text('แตะปุ่มกลมตรงกลางเพื่อเริ่มบันทึก', style: AppText.body),
           ],
         ),
       );
     }
-    final shape = RouteShape.fromSegments(a.segments);
+    final weight = context.select((ProfileCubit c) => c.state.weightKg);
+    final speed = a.summary.averageSpeedMps;
+    final kcal = estimateCalories(
+      type: a.type,
+      distanceMeters: a.distanceMeters,
+      movingTime: a.movingTime,
+      weightKg: weight,
+    );
+    final effort = insights?.effort;
     return GlassCard(
-      padding: EdgeInsets.zero,
+      radius: 28,
+      padding: const EdgeInsets.all(14),
       onTap: () async {
         await Navigator.of(context).push(ActivityDetailPage.route(a.id));
         if (context.mounted) await context.refreshActivities();
       },
-      child: SizedBox(
-        height: 210,
-        child: Stack(
-          children: [
-            Positioned.fill(
-              bottom: 70,
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
-                child: CustomPaint(
-                  painter: RoutePainter(
-                    shape: shape,
-                    color: AppColors.lime,
-                    strokeWidth: 3,
-                    shadow: false,
+      child: Column(
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(20),
+            child: Container(
+              height: 210,
+              color: AppColors.background,
+              child: Stack(
+                children: [
+                  // Keep the route clear of the badge row on top.
+                  Positioned.fill(
+                    top: 44,
+                    child: RouteCanvas(
+                      shape: RouteShape.fromSegments(a.segments),
+                      padding: 0.1,
+                    ),
                   ),
-                ),
+                  Positioned(
+                    left: 12,
+                    top: 12,
+                    child: StatusPill(
+                      text: a.type.label,
+                      dotColor: AppColors.mint,
+                    ),
+                  ),
+                  Positioned(
+                    right: 12,
+                    top: 12,
+                    child: StatusPill(
+                      text: a.type.usesPace
+                          ? 'PACE ${formatPaceQuote(speed)}'
+                          : '${formatSpeedKmh(speed)} KM/H',
+                      mono: true,
+                      color: AppColors.lime,
+                    ),
+                  ),
+                ],
               ),
             ),
-            Positioned(
-              left: 12,
-              right: 12,
-              bottom: 12,
-              child: GlassCard(
-                blur: true,
-                strong: true,
-                radius: 14,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 14,
-                  vertical: 10,
+          ),
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: AppColors.glassFill,
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 52,
+                  height: 52,
+                  decoration: BoxDecoration(
+                    color: AppColors.limeSoft,
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Icon(a.type.icon, color: AppColors.lime, size: 28),
                 ),
-                child: Row(
-                  children: [
-                    Icon(a.type.icon, color: AppColors.lime, size: 28),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
                         children: [
-                          Text(
-                            a.title,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              fontSize: 12,
-                              color: AppColors.textSecondary,
+                          Flexible(
+                            child: Text(
+                              a.title,
+                              style: AppText.headlineSm,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ),
-                          Text(
-                            '${formatDistanceKm(a.distanceMeters)} กม.',
-                            style: const TextStyle(
-                              fontSize: 20,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
+                          if (effort != null) ...[
+                            const SizedBox(width: 8),
+                            _Tag(effort.tag(a.type)),
+                          ],
                         ],
                       ),
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      formatRelative(a.endedAt, now),
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: AppColors.textSecondary,
+                      const SizedBox(height: 2),
+                      Text.rich(
+                        TextSpan(
+                          children: [
+                            TextSpan(
+                              text: formatDistanceKm(a.distanceMeters),
+                              style: AppText.metricSm,
+                            ),
+                            const TextSpan(text: ' กม.  •  '),
+                            TextSpan(
+                              text: formatDurationShort(a.movingTime),
+                              style: AppText.metricSm,
+                            ),
+                          ],
+                        ),
+                        style: AppText.caption,
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
+                ),
+                StatusPill(text: formatRelative(a.endedAt, now)),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          const Divider(height: 1),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              _MiniStat(
+                label: a.type.usesPace ? 'เพซเฉลี่ย' : 'ความเร็วเฉลี่ย',
+                value: a.type.usesPace
+                    ? formatPaceQuote(speed)
+                    : '${formatSpeedKmh(speed)} กม./ชม.',
+              ),
+              _MiniStat(label: 'แคลอรี่', value: '${kcal.round()} kcal'),
+              _MiniStat(
+                label: 'ขึ้นสะสม',
+                value: '${a.elevationGainMeters.round()} ม.',
+                color: AppColors.lime,
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _Tag extends StatelessWidget {
+  const _Tag(this.text);
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+    decoration: BoxDecoration(
+      color: AppColors.secondary.withValues(alpha: 0.18),
+      borderRadius: BorderRadius.circular(8),
+    ),
+    child: Text(
+      text,
+      style: AppText.monoLabel.copyWith(color: AppColors.secondary),
+    ),
+  );
+}
+
+class _MiniStat extends StatelessWidget {
+  const _MiniStat({required this.label, required this.value, this.color});
+
+  final String label;
+  final String value;
+  final Color? color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 4),
+        padding: const EdgeInsets.symmetric(vertical: 10),
+        decoration: BoxDecoration(
+          color: AppColors.glassFill,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Column(
+          children: [
+            Text(label, style: AppText.caption),
+            const SizedBox(height: 2),
+            FittedBox(
+              child: Text(
+                value,
+                style: AppText.metricSm.copyWith(
+                  color: color,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _ChallengeCard extends StatelessWidget {
+  const _ChallengeCard({required this.challenge, required this.meters});
+
+  final MonthlyChallenge challenge;
+  final double meters;
+
+  @override
+  Widget build(BuildContext context) {
+    final progress = (meters / challenge.goalMeters).clamp(0.0, 1.0);
+    final left = (challenge.goalMeters - meters).clamp(0, double.infinity);
+    final done = left <= 0;
+    return GlassCard(
+      padding: const EdgeInsets.all(16),
+      child: Row(
+        children: [
+          Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              color: AppColors.secondary.withValues(alpha: 0.18),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              done ? Icons.emoji_events_rounded : Icons.military_tech_outlined,
+              color: AppColors.secondary,
+            ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  challenge.title,
+                  style: AppText.bodyLg.copyWith(fontWeight: FontWeight.w500),
+                ),
+                Text(
+                  done
+                      ? 'สำเร็จแล้ว! ได้รับเหรียญ ${challenge.badge}'
+                      : 'สะสมอีก ${formatDistanceKm(left.toDouble())} กม. '
+                            'เพื่อรับเหรียญ ${challenge.badge}',
+                  style: AppText.caption.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                TweenAnimationBuilder<double>(
+                  tween: Tween(end: progress),
+                  duration: const Duration(milliseconds: 1100),
+                  curve: Curves.easeOutCubic,
+                  builder: (context, v, _) => ClipRRect(
+                    borderRadius: BorderRadius.circular(99),
+                    child: LinearProgressIndicator(
+                      value: v,
+                      minHeight: 6,
+                      color: AppColors.secondary,
+                      backgroundColor: AppColors.surfaceHighest,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

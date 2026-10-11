@@ -123,6 +123,15 @@ class ActivityLocalDataSource {
     });
   }
 
+  /// Activities recorded while signed out (not yet claimed by an account).
+  Future<int> unclaimedCount() async {
+    final rows = await _db.rawQuery(
+      'SELECT COUNT(*) AS n FROM $_activities '
+      'WHERE owner_id IS NULL AND deleted_at IS NULL',
+    );
+    return rows.first['n']! as int;
+  }
+
   /// Gives activities recorded while signed out to [ownerId].
   Future<void> claimUnowned(String ownerId) =>
       _db.update(_activities, {'owner_id': ownerId}, where: 'owner_id IS NULL');

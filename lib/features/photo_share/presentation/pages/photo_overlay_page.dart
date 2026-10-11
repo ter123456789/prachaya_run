@@ -6,7 +6,9 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/theme/app_colors.dart';
-import '../../../../core/widgets/circle_icon_button.dart';
+import '../../../../core/widgets/app_chip.dart';
+import '../../../../core/widgets/app_top_bar.dart';
+import '../../../../core/widgets/pressable.dart';
 import '../../../../core/widgets/glow_background.dart';
 import '../../../../core/widgets/pill_tabs.dart';
 import '../../../activity/domain/entities/activity.dart';
@@ -107,38 +109,38 @@ class _PhotoOverlayPageState extends State<PhotoOverlayPage> {
               child: Column(
                 children: [
                   Padding(
-                    padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
-                    child: Row(
-                      children: [
-                        CircleIconButton(
-                          icon: Icons.arrow_back,
-                          tooltip: 'กลับ',
-                          onPressed: () => Navigator.of(context).maybePop(),
-                        ),
-                        const Expanded(
-                          child: Text(
-                            'ใส่ลงรูปภาพ',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 48),
-                      ],
+                    padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+                    child: AppTopBar(
+                      title: 'สตูดิโอแชร์รูป',
+                      onBack: () => Navigator.of(context).maybePop(),
                     ),
                   ),
                   Expanded(
                     child: Padding(
                       padding: const EdgeInsets.all(16),
                       child: Center(
-                        child: AspectRatio(
-                          aspectRatio: state.frame.aspectRatio,
-                          child: _Preview(
-                            canvasKey: _canvasKey,
-                            state: state,
-                            cubit: cubit,
+                        child: TweenAnimationBuilder<double>(
+                          tween: Tween(end: state.frame.aspectRatio),
+                          duration: const Duration(milliseconds: 380),
+                          curve: Curves.easeOutCubic,
+                          builder: (context, ratio, child) =>
+                              AspectRatio(aspectRatio: ratio, child: child),
+                          child: DecoratedBox(
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(28),
+                              boxShadow: const [
+                                BoxShadow(
+                                  color: Color(0x99000000),
+                                  blurRadius: 40,
+                                  offset: Offset(0, 20),
+                                ),
+                              ],
+                            ),
+                            child: _Preview(
+                              canvasKey: _canvasKey,
+                              state: state,
+                              cubit: cubit,
+                            ),
                           ),
                         ),
                       ),
@@ -156,7 +158,7 @@ class _PhotoOverlayPageState extends State<PhotoOverlayPage> {
                               onPressed: state.isBusy
                                   ? null
                                   : () => cubit.save(_render),
-                              icon: const Icon(Icons.download),
+                              icon: const Icon(Icons.download_rounded),
                               label: const Text('บันทึกรูป'),
                             ),
                           ),
@@ -177,7 +179,7 @@ class _PhotoOverlayPageState extends State<PhotoOverlayPage> {
                                         strokeWidth: 2,
                                       ),
                                     )
-                                  : const Icon(Icons.ios_share),
+                                  : const Icon(Icons.ios_share_rounded),
                               label: const Text('แชร์'),
                             ),
                           ),
@@ -212,7 +214,7 @@ class _Preview extends StatelessWidget {
     final photo = cutout ? null : state.photo;
     final card = photo == null && !cutout;
     return ClipRRect(
-      borderRadius: BorderRadius.circular(20),
+      borderRadius: BorderRadius.circular(28),
       child: Stack(
         fit: StackFit.expand,
         children: [
@@ -239,6 +241,7 @@ class _Preview extends StatelessWidget {
                   language: state.language,
                   showHeader: card,
                   cutout: cutout,
+                  showBrand: state.showLogo,
                   color: _tintColor(context, state.tint),
                   // White text with a lime route, like Strava's orange line.
                   routeColor: state.tint == OverlayTint.white
@@ -278,87 +281,89 @@ class _Options extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              children: [
-                _GlassChip(
-                  icon: Icons.photo_library_outlined,
-                  label: 'เลือกรูป',
-                  onPressed: () => cubit.pickPhoto(PhotoOrigin.gallery),
-                ),
-                const SizedBox(width: 8),
-                _GlassChip(
-                  icon: Icons.photo_camera_outlined,
-                  label: 'ถ่ายรูป',
-                  onPressed: () => cubit.pickPhoto(PhotoOrigin.camera),
-                ),
-                const SizedBox(width: 8),
-                if (state.photo != null) ...[
-                  _GlassChip(
-                    icon: Icons.hide_image_outlined,
-                    label: 'ลบรูป',
-                    onPressed: cubit.removePhoto,
-                  ),
-                  const SizedBox(width: 8),
-                ],
-                _GlassChip(
-                  icon: Icons.layers_clear_outlined,
-                  label: 'พื้นใส',
-                  selected: state.isCutout,
-                  onPressed: () => cubit.setBackground(
-                    state.isCutout
-                        ? OverlayBackground.card
-                        : OverlayBackground.transparent,
-                  ),
-                ),
-                const SizedBox(width: 16),
-                for (final tint in OverlayTint.values)
-                  Padding(
-                    padding: const EdgeInsets.only(right: 8),
-                    child: _TintSwatch(
-                      color: _tintColor(context, tint),
-                      selected: state.tint == tint,
-                      onTap: () => cubit.setTint(tint),
-                    ),
-                  ),
-              ],
-            ),
-          ),
-          if (state.layout != OverlayLayout.routeOnly) ...[
-            const SizedBox(height: 8),
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                children: [
-                  _GlassChip(
-                    icon: Icons.translate,
-                    label: 'EN',
-                    selected: state.language == OverlayLanguage.en,
-                    onPressed: () => cubit.setLanguage(
-                      state.language == OverlayLanguage.en
-                          ? OverlayLanguage.th
-                          : OverlayLanguage.en,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  for (final stat in OverlayStat.values)
-                    Padding(
-                      padding: const EdgeInsets.only(right: 8),
-                      child: _GlassChip(
-                        icon: state.stats.contains(stat)
-                            ? Icons.check
-                            : Icons.add,
-                        label: _statLabel(stat),
-                        selected: state.stats.contains(stat),
-                        onPressed: () => cubit.toggleStat(stat),
-                      ),
-                    ),
-                ],
+          _ChipRow(
+            children: [
+              AppChip(
+                pill: true,
+                icon: Icons.photo_library_outlined,
+                label: 'เลือกรูป',
+                onTap: () => cubit.pickPhoto(PhotoOrigin.gallery),
               ),
-            ),
-          ],
-          const SizedBox(height: 8),
+              AppChip(
+                pill: true,
+                icon: Icons.photo_camera_outlined,
+                label: 'ถ่ายรูป',
+                onTap: () => cubit.pickPhoto(PhotoOrigin.camera),
+              ),
+              if (state.photo != null)
+                AppChip(
+                  pill: true,
+                  icon: Icons.hide_image_outlined,
+                  label: 'ลบรูป',
+                  onTap: cubit.removePhoto,
+                ),
+              AppChip(
+                pill: true,
+                icon: Icons.layers_clear_outlined,
+                label: 'พื้นใส',
+                selected: state.isCutout,
+                onTap: () => cubit.setBackground(
+                  state.isCutout
+                      ? OverlayBackground.card
+                      : OverlayBackground.transparent,
+                ),
+              ),
+              AppChip(
+                pill: true,
+                icon: Icons.branding_watermark_outlined,
+                label: 'โลโก้',
+                selected: state.showLogo,
+                onTap: () => cubit.setShowLogo(!state.showLogo),
+              ),
+              for (final tint in OverlayTint.values)
+                _TintSwatch(
+                  color: _tintColor(context, tint),
+                  selected: state.tint == tint,
+                  onTap: () => cubit.setTint(tint),
+                ),
+            ],
+          ),
+          AnimatedSize(
+            duration: const Duration(milliseconds: 250),
+            curve: Curves.easeOutCubic,
+            child: state.layout == OverlayLayout.routeOnly
+                ? const SizedBox(width: double.infinity)
+                : Padding(
+                    padding: const EdgeInsets.only(top: 10),
+                    child: _ChipRow(
+                      children: [
+                        AppChip(
+                          pill: true,
+                          icon: Icons.translate_rounded,
+                          label: 'EN',
+                          selected: state.language == OverlayLanguage.en,
+                          onTap: () => cubit.setLanguage(
+                            state.language == OverlayLanguage.en
+                                ? OverlayLanguage.th
+                                : OverlayLanguage.en,
+                          ),
+                        ),
+                        for (final stat in OverlayStat.values)
+                          AppChip(
+                            pill: true,
+                            solid: true,
+                            icon: state.stats.contains(stat)
+                                ? Icons.check_rounded
+                                : Icons.add_rounded,
+                            label: _statLabel(stat),
+                            selected: state.stats.contains(stat),
+                            onTap: () => cubit.toggleStat(stat),
+                          ),
+                      ],
+                    ),
+                  ),
+          ),
+          const SizedBox(height: 10),
           PillTabs<OverlayLayout>(
             items: OverlayLayout.values,
             selected: state.layout,
@@ -376,8 +381,31 @@ class _Options extends StatelessWidget {
             items: OverlayFrame.values,
             selected: state.frame,
             labelOf: (f) => f.label,
+            mono: true,
             onChanged: cubit.setFrame,
           ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ChipRow extends StatelessWidget {
+  const _ChipRow({required this.children});
+
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      clipBehavior: Clip.none,
+      child: Row(
+        children: [
+          for (final (i, c) in children.indexed) ...[
+            if (i > 0) const SizedBox(width: 8),
+            c,
+          ],
         ],
       ),
     );
@@ -434,19 +462,28 @@ class _TintSwatch extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final outline = Theme.of(context).colorScheme.outline;
-    return GestureDetector(
+    return Pressable(
       onTap: onTap,
-      child: Container(
-        width: 32,
-        height: 32,
+      scale: 0.88,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 220),
+        width: 36,
+        height: 36,
         decoration: BoxDecoration(
           color: color,
           shape: BoxShape.circle,
           border: Border.all(
-            color: selected ? Theme.of(context).colorScheme.primary : outline,
+            color: selected ? AppColors.lime : AppColors.glassBorder,
             width: selected ? 3 : 1,
           ),
+          boxShadow: selected
+              ? [
+                  BoxShadow(
+                    color: AppColors.lime.withValues(alpha: 0.4),
+                    blurRadius: 12,
+                  ),
+                ]
+              : null,
         ),
       ),
     );
@@ -482,50 +519,4 @@ class _CheckerPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_CheckerPainter oldDelegate) => false;
-}
-
-class _GlassChip extends StatelessWidget {
-  const _GlassChip({
-    required this.icon,
-    required this.label,
-    required this.onPressed,
-    this.selected = false,
-  });
-
-  final IconData icon;
-  final String label;
-  final VoidCallback onPressed;
-  final bool selected;
-
-  @override
-  Widget build(BuildContext context) {
-    final fg = selected ? AppColors.onLime : AppColors.textPrimary;
-    return Material(
-      color: selected ? AppColors.lime : AppColors.glassFill,
-      shape: StadiumBorder(
-        side: selected
-            ? BorderSide.none
-            : const BorderSide(color: AppColors.glassBorder),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onPressed,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                icon,
-                size: 18,
-                color: selected ? AppColors.onLime : AppColors.lime,
-              ),
-              const SizedBox(width: 6),
-              Text(label, style: TextStyle(color: fg)),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
 }

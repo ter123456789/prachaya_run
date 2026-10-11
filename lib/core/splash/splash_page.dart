@@ -40,14 +40,6 @@ class _SplashPageState extends State<SplashPage>
   late final _tagline = _interval(0.6, 0.9);
 
   @override
-  void initState() {
-    super.initState();
-    _controller.addStatusListener((status) {
-      if (status == AnimationStatus.completed) _goNext();
-    });
-  }
-
-  @override
   void didChangeDependencies() {
     super.didChangeDependencies();
     if (_controller.isAnimating || _controller.isCompleted) return;
@@ -56,12 +48,16 @@ class _SplashPageState extends State<SplashPage>
       _controller.value = 1;
       WidgetsBinding.instance.addPostFrameCallback((_) => _goNext());
     } else {
-      _controller.forward();
+      _controller.forward().then((_) => _goNext());
     }
   }
 
+  bool _left = false;
+
+  /// Runs once, never during a build.
   void _goNext() {
-    if (!mounted) return;
+    if (!mounted || _left) return;
+    _left = true;
     Navigator.of(context).pushReplacement(
       PageRouteBuilder<void>(
         transitionDuration: const Duration(milliseconds: 550),

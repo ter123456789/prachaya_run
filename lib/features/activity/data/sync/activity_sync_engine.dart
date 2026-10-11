@@ -47,6 +47,13 @@ class ActivitySyncEngine implements ActivitySync {
     return _running = _loop().whenComplete(() => _running = null);
   }
 
+  @override
+  Future<int> pendingCount() async {
+    final session = await _tokens.read();
+    if (session == null) return _local.unclaimedCount();
+    return (await _local.pendingChanges(ownerId: session.userId)).length;
+  }
+
   /// Fire-and-forget sync after a local save or delete.
   void schedule() => unawaited(sync());
 

@@ -2,20 +2,26 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 
 import 'app.dart';
 import 'core/network/api_client.dart';
 import 'core/network/api_config.dart';
 import 'core/network/token_store.dart';
+import 'core/storage/kv_store.dart';
 import 'features/activity/data/datasources/activity_local_data_source.dart';
 import 'features/activity/data/datasources/activity_remote_data_source.dart';
 import 'features/activity/data/datasources/app_database.dart';
 import 'features/activity/data/datasources/photo_local_data_source.dart';
+import 'features/activity/data/repositories/http_challenge_repository.dart';
 import 'features/activity/data/repositories/offline_first_activity_repository.dart';
+import 'features/activity/data/repositories/offline_first_photo_repository.dart';
 import 'features/activity/data/services/geolocator_location_tracker.dart';
+import 'features/activity/data/services/open_meteo_weather_service.dart';
 import 'features/activity/data/sync/activity_sync_engine.dart';
 import 'features/auth/data/repositories/http_auth_repository.dart';
+import 'features/auth/data/repositories/http_profile_repository.dart';
 import 'features/debug/data/debug_http_client.dart';
 import 'features/debug/data/device_debug_tools.dart';
 import 'features/debug/data/simulated_location_tracker.dart';
@@ -35,6 +41,7 @@ Future<void> main() async {
     tokens: tokens,
     httpClient: debugHttp,
   );
+  final kv = KvStore(database);
   final local = ActivityLocalDataSource(database);
   final photos = PhotoLocalDataSource(
     database,
@@ -64,6 +71,10 @@ Future<void> main() async {
       activityRepository: activities,
       activitySync: sync,
       authRepository: HttpAuthRepository(api, tokens),
+      profileRepository: HttpProfileRepository(api, tokens, kv),
+      photoRepository: OfflineFirstPhotoRepository(photos, sync, tokens),
+      challengeRepository: HttpChallengeRepository(api, tokens, kv),
+      weatherService: OpenMeteoWeatherService(http.Client(), kv),
       locationTracker: simTracker ?? realTracker,
       photoSource: ImagePickerPhotoSource(),
       imageSink: DeviceImageSink(),

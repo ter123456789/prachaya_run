@@ -9,6 +9,10 @@ import 'package:prachaya_run/features/activity/domain/services/activity_sync.dar
 import 'package:prachaya_run/features/activity/domain/services/location_tracker.dart';
 import 'package:prachaya_run/features/auth/domain/entities/auth_user.dart';
 import 'package:prachaya_run/features/auth/domain/repositories/auth_repository.dart';
+import 'package:prachaya_run/features/auth/domain/entities/user_profile.dart';
+import 'package:prachaya_run/features/auth/domain/repositories/profile_repository.dart';
+import 'package:prachaya_run/features/activity/domain/entities/activity_photo.dart';
+import 'package:prachaya_run/features/activity/domain/repositories/activity_photo_repository.dart';
 import 'package:prachaya_run/features/debug/domain/entities/gps_simulation.dart';
 import 'package:prachaya_run/features/debug/domain/services/debug_tools.dart';
 import 'package:prachaya_run/features/photo_share/domain/services/image_sink.dart';
@@ -77,11 +81,16 @@ class FakeActivitySync implements ActivitySync {
   @override
   Stream<void> get changes => changesController.stream;
 
+  int pending = 0;
+
   @override
   Future<SyncOutcome> sync() async {
     calls++;
     return next;
   }
+
+  @override
+  Future<int> pendingCount() async => pending;
 }
 
 class FakeAuthRepository implements AuthRepository {
@@ -149,6 +158,49 @@ class FakeDebugTools implements DebugTools {
   Future<int> seedActivities({int count = 10}) async => seeded += count;
   @override
   Future<void> clearLocalData() async {}
+}
+
+class FakeProfileRepository implements ProfileRepository {
+  UserProfile? profile = const UserProfile();
+
+  @override
+  Future<UserProfile?> load() async => profile;
+
+  @override
+  Future<UserProfile> update({
+    String? displayName,
+    double? weightKg,
+    bool clearWeight = false,
+  }) async => profile = UserProfile(
+    displayName: displayName ?? profile?.displayName,
+    weightKg: clearWeight ? null : weightKg ?? profile?.weightKg,
+  );
+}
+
+class InMemoryPhotoRepository implements ActivityPhotoRepository {
+  final List<ActivityPhoto> photos = [];
+
+  @override
+  Future<List<ActivityPhoto>> photosOf(String activityId) async =>
+      photos.where((p) => p.activityId == activityId).toList();
+
+  @override
+  Future<ActivityPhoto> add(
+    String activityId,
+    List<int> bytes, {
+    required DateTime takenAt,
+  }) async {
+    final photo = ActivityPhoto(
+      id: 'p${photos.length}',
+      activityId: activityId,
+      takenAt: takenAt,
+    );
+    photos.add(photo);
+    return photo;
+  }
+
+  @override
+  Future<void> delete(ActivityPhoto photo) async => photos.remove(photo);
 }
 
 class FakePhotoSource implements PhotoSource {

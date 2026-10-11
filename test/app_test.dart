@@ -14,11 +14,18 @@ void main() {
     tester.view.physicalSize = const Size(1179, 2556);
     tester.view.devicePixelRatio = 3;
     addTearDown(tester.view.reset);
+    // Looping motion (pulse dots, shimmer) pauses under "reduce motion",
+    // which also lets pumpAndSettle finish.
+    tester.platformDispatcher.accessibilityFeaturesTestValue =
+        const FakeAccessibilityFeatures(disableAnimations: true);
+    addTearDown(tester.platformDispatcher.clearAccessibilityFeaturesTestValue);
     await tester.pumpWidget(
       PrachayaRunApp(
         activityRepository: repo,
         activitySync: FakeActivitySync(),
         authRepository: FakeAuthRepository(),
+        profileRepository: FakeProfileRepository(),
+        photoRepository: InMemoryPhotoRepository(),
         locationTracker: FakeLocationTracker(),
         photoSource: FakePhotoSource(),
         imageSink: FakeImageSink(),
@@ -52,10 +59,8 @@ void main() {
     await pumpApp(tester, repo);
 
     expect(find.text('วิ่งตอนเช้า'), findsOneWidget); // latest activity card
-    expect(
-      find.text('${(activity.distanceMeters / 1000).toStringAsFixed(2)} กม.'),
-      findsWidgets,
-    );
+    final km = (activity.distanceMeters / 1000).toStringAsFixed(2);
+    expect(find.textContaining(km, findRichText: true), findsWidgets);
 
     await tester.tap(find.byTooltip('ประวัติ'));
     await tester.pumpAndSettle();
@@ -101,5 +106,52 @@ void main() {
     await tester.tap(find.text('ให้ access token หมดอายุ'));
     await tester.pumpAndSettle();
     expect(tools.expired, 1);
+  });
+
+  testWidgets('history card opens the redesigned detail screen', (
+    tester,
+  ) async {
+    final repo = InMemoryActivityRepository();
+    final activity = sampleActivity();
+    repo.store[activity.id] = activity;
+    await pumpApp(tester, repo);
+
+    await tester.tap(find.byTooltip('ประวัติ'));
+    await tester.pumpAndSettle();
+    expect(find.text('ตุลาคม 2569'), findsOneWidget);
+    expect(find.text('1 กิจกรรม'), findsOneWidget);
+
+    await tester.tap(find.text('วิ่งตอนเช้า').last);
+    await tester.pumpAndSettle();
+    expect(find.text('รายละเอียดกิจกรรม'), findsOneWidget);
+    expect(find.text('OUTDOOR RUN'), findsOneWidget);
+    expect(find.text('ใส่เส้นทางและสถิติลงรูปภาพ'), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.text('ภาพบันทึกหลังวิ่ง'),
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(find.text('0 ภาพถ่าย'), findsOneWidget);
+  });
+
+  testWidgets('account screen: sign-in form with inline validation', (
+    tester,
+  ) async {
+    await pumpApp(tester, InMemoryActivityRepository());
+    await tester.tap(find.byTooltip('บัญชี').first);
+    await tester.pumpAndSettle();
+
+    expect(find.text('ซิงก์กิจกรรมข้ามเครื่อง'), findsOneWidget);
+    await tester.enterText(find.byType(TextField).first, 'not-an-email');
+    await tester.enterText(find.byType(TextField).last, 'password1');
+    await tester.tap(find.widgetWithText(FilledButton, 'เข้าสู่ระบบ'));
+    await tester.pumpAndSettle();
+    expect(find.text('การแจ้งเตือนรูปแบบ'), findsOneWidget);
+
+    await tester.enterText(find.byType(TextField).first, 'me@run.co');
+    await tester.tap(find.widgetWithText(FilledButton, 'เข้าสู่ระบบ'));
+    await tester.pumpAndSettle();
+    expect(find.text('me@run.co'), findsOneWidget);
+    expect(find.text('ซิงก์ตอนนี้'), findsOneWidget);
   });
 }

@@ -11,6 +11,7 @@ final class SyncState extends Equatable {
     this.lastOutcome,
     this.lastSyncedAt,
     this.revision = 0,
+    this.pending = 0,
   });
 
   final bool syncing;
@@ -20,20 +21,31 @@ final class SyncState extends Equatable {
   /// Bumped whenever a sync changed local data; lists reload on change.
   final int revision;
 
+  /// Local changes not yet on the server.
+  final int pending;
+
   SyncState copyWith({
     bool? syncing,
     SyncOutcome? lastOutcome,
     DateTime? lastSyncedAt,
     int? revision,
+    int? pending,
   }) => SyncState(
     syncing: syncing ?? this.syncing,
     lastOutcome: lastOutcome ?? this.lastOutcome,
     lastSyncedAt: lastSyncedAt ?? this.lastSyncedAt,
     revision: revision ?? this.revision,
+    pending: pending ?? this.pending,
   );
 
   @override
-  List<Object?> get props => [syncing, lastOutcome, lastSyncedAt, revision];
+  List<Object?> get props => [
+    syncing,
+    lastOutcome,
+    lastSyncedAt,
+    revision,
+    pending,
+  ];
 }
 
 class SyncCubit extends Cubit<SyncState> {
@@ -53,14 +65,23 @@ class SyncCubit extends Cubit<SyncState> {
     emit(state.copyWith(syncing: true));
     final outcome = await _sync.sync();
     if (isClosed) return outcome;
+    final pending = await _sync.pendingCount();
+    if (isClosed) return outcome;
     emit(
       state.copyWith(
         syncing: false,
         lastOutcome: outcome,
         lastSyncedAt: outcome == SyncOutcome.synced ? _clock() : null,
+        pending: pending,
       ),
     );
     return outcome;
+  }
+
+  /// Re-counts local changes waiting for the server.
+  Future<void> refreshPending() async {
+    final pending = await _sync.pendingCount();
+    if (!isClosed) emit(state.copyWith(pending: pending));
   }
 
   @override

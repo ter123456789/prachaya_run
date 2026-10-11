@@ -22,4 +22,8 @@ abstract interface class ActivitySync {
   /// Fires after a sync changed the local data (e.g. pulled an activity
   /// from another device), so lists can reload.
   Stream<void> get changes;
+
+  /// Local activity changes (saves and deletes) the server has not seen.
+  /// Signed out, everything recorded so far counts.
+  Future<int> pendingCount();
 }

@@ -25,6 +25,7 @@ class ActivityOverlay extends StatelessWidget {
     this.routeColor,
     this.showHeader = false,
     this.cutout = false,
+    this.showBrand = true,
   });
 
   final Activity activity;
@@ -45,6 +46,9 @@ class ActivityOverlay extends StatelessWidget {
   /// backgrounds left behind as grey halos.
   final bool cutout;
 
+  /// Draws the PRACHAYA RUN wordmark.
+  final bool showBrand;
+
   /// Light ink gets a shadow so it stays readable on bright photos.
   bool get _needsShadow => !cutout && color.computeLuminance() > 0.5;
 
@@ -56,10 +60,12 @@ class ActivityOverlay extends StatelessWidget {
         final stats = [
           for (final s in this.stats) _item(activity, s, language),
         ];
-        final brand = FittedBox(
-          fit: BoxFit.scaleDown,
-          child: _Brand(activity, u: u, color: color),
-        );
+        final Widget brand = !showBrand
+            ? const SizedBox.shrink()
+            : FittedBox(
+                fit: BoxFit.scaleDown,
+                child: _Brand(activity, u: u, color: color),
+              );
         Widget routeBox() => CustomPaint(
           size: Size.infinite,
           painter: RoutePainter(
