@@ -15,6 +15,9 @@ import 'features/activity/presentation/bloc/sync/sync_cubit.dart';
 import 'features/activity/presentation/pages/home_page.dart';
 import 'features/auth/domain/repositories/auth_repository.dart';
 import 'features/auth/presentation/bloc/auth_cubit.dart';
+import 'features/debug/domain/services/debug_tools.dart';
+import 'features/debug/presentation/debug_cubit.dart';
+import 'features/debug/presentation/debug_overlay.dart';
 import 'features/photo_share/domain/services/image_sink.dart';
 import 'features/photo_share/domain/services/photo_source.dart';
 
@@ -27,7 +30,11 @@ class PrachayaRunApp extends StatelessWidget {
     required this.locationTracker,
     required this.photoSource,
     required this.imageSink,
+    this.debugTools,
+    this.clock,
   });
+
+  static final _navigatorKey = GlobalKey<NavigatorState>();
 
   final ActivityRepository activityRepository;
   final ActivitySync activitySync;
@@ -35,6 +42,12 @@ class PrachayaRunApp extends StatelessWidget {
   final LocationTracker locationTracker;
   final PhotoSource photoSource;
   final ImageSink imageSink;
+
+  /// Debug builds only: enables the floating test-tools button.
+  final DebugTools? debugTools;
+
+  /// Time source for recording (debug builds pass a speed-up clock).
+  final DateTime Function()? clock;
 
   @override
   Widget build(BuildContext context) {
@@ -50,6 +63,7 @@ class PrachayaRunApp extends StatelessWidget {
             create: (_) => RecordBloc(
               locationTracker: locationTracker,
               saveActivity: SaveActivity(activityRepository),
+              clock: clock,
             ),
           ),
           BlocProvider(create: (_) => HistoryCubit(activityRepository)..load()),
@@ -58,6 +72,8 @@ class PrachayaRunApp extends StatelessWidget {
           ),
           BlocProvider(create: (_) => SyncCubit(activitySync)),
           BlocProvider(create: (_) => AuthCubit(authRepository)..start()),
+          if (debugTools case final tools?)
+            BlocProvider(create: (_) => DebugCubit(tools)),
         ],
         child: MultiBlocListener(
           listeners: [
@@ -80,6 +96,11 @@ class PrachayaRunApp extends StatelessWidget {
             ),
           ],
           child: MaterialApp(
+            navigatorKey: _navigatorKey,
+            builder: debugTools == null
+                ? null
+                : (context, child) =>
+                      DebugOverlay(navigatorKey: _navigatorKey, child: child!),
             title: 'Prachaya Run',
             debugShowCheckedModeBanner: false,
             theme: AppTheme.dark(),

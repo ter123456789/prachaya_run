@@ -7,8 +7,9 @@ import 'helpers/fakes.dart';
 void main() {
   Future<void> pumpApp(
     WidgetTester tester,
-    InMemoryActivityRepository repo,
-  ) async {
+    InMemoryActivityRepository repo, {
+    FakeDebugTools? debugTools,
+  }) async {
     // Phone-sized viewport.
     tester.view.physicalSize = const Size(1179, 2556);
     tester.view.devicePixelRatio = 3;
@@ -21,6 +22,7 @@ void main() {
         locationTracker: FakeLocationTracker(),
         photoSource: FakePhotoSource(),
         imageSink: FakeImageSink(),
+        debugTools: debugTools,
       ),
     );
     await tester.pumpAndSettle();
@@ -62,5 +64,42 @@ void main() {
     await tester.tap(find.text('ปั่นจักรยาน'));
     await tester.pumpAndSettle();
     expect(find.text('ยังไม่มีกิจกรรม ออกไปวิ่งกัน!'), findsOneWidget);
+  });
+
+  testWidgets('no debug button unless debug tools are given', (tester) async {
+    await pumpApp(tester, InMemoryActivityRepository());
+    expect(find.byIcon(Icons.bug_report_rounded), findsNothing);
+  });
+
+  testWidgets('debug button opens the panel; tools are wired', (tester) async {
+    final tools = FakeDebugTools();
+    await pumpApp(tester, InMemoryActivityRepository(), debugTools: tools);
+
+    await tester.tap(find.byIcon(Icons.bug_report_rounded));
+    await tester.pumpAndSettle();
+    expect(find.text('เครื่องมือทดสอบ'), findsOneWidget);
+
+    await tester.tap(find.text('ใช้ GPS จำลอง'));
+    await tester.pumpAndSettle();
+    expect(tools.gps.enabled, isTrue);
+    expect(find.text('ดอยสุเทพ'), findsOneWidget);
+
+    await tester.scrollUntilVisible(
+      find.text('เพิ่มกิจกรรมตัวอย่าง 10 รายการ'),
+      200,
+      scrollable: find.byType(Scrollable).last,
+    );
+    await tester.tap(find.text('เพิ่มกิจกรรมตัวอย่าง 10 รายการ'));
+    await tester.pumpAndSettle();
+    expect(tools.seeded, 10);
+
+    await tester.scrollUntilVisible(
+      find.text('ให้ access token หมดอายุ'),
+      200,
+      scrollable: find.byType(Scrollable).last,
+    );
+    await tester.tap(find.text('ให้ access token หมดอายุ'));
+    await tester.pumpAndSettle();
+    expect(tools.expired, 1);
   });
 }

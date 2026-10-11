@@ -9,6 +9,8 @@ import 'package:prachaya_run/features/activity/domain/services/activity_sync.dar
 import 'package:prachaya_run/features/activity/domain/services/location_tracker.dart';
 import 'package:prachaya_run/features/auth/domain/entities/auth_user.dart';
 import 'package:prachaya_run/features/auth/domain/repositories/auth_repository.dart';
+import 'package:prachaya_run/features/debug/domain/entities/gps_simulation.dart';
+import 'package:prachaya_run/features/debug/domain/services/debug_tools.dart';
 import 'package:prachaya_run/features/photo_share/domain/services/image_sink.dart';
 import 'package:prachaya_run/features/photo_share/domain/services/photo_source.dart';
 
@@ -121,6 +123,32 @@ class FakeAuthRepository implements AuthRepository {
 
   @override
   Future<void> logout() async => user = null;
+}
+
+class FakeDebugTools implements DebugTools {
+  @override
+  GpsSimulation gps = const GpsSimulation();
+  @override
+  bool offline = false;
+  int seeded = 0;
+  int expired = 0;
+
+  @override
+  void setGps(GpsSimulation value) => gps = value;
+  @override
+  void dropGpsSignal() {}
+  @override
+  void setOffline(bool value) => offline = value;
+  @override
+  void expireAccessTokenOnce() => expired++;
+  @override
+  Future<void> breakSession() async {}
+  @override
+  Future<int> pendingSyncCount() async => 0;
+  @override
+  Future<int> seedActivities({int count = 10}) async => seeded += count;
+  @override
+  Future<void> clearLocalData() async {}
 }
 
 class FakePhotoSource implements PhotoSource {

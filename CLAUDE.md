@@ -19,6 +19,10 @@ lib/
     domain/                 # AuthUser, AuthRepository port, credential checks
     data/                   # HttpAuthRepository
     presentation/           # AuthCubit, AccountPage (sign in/up, sync now, sign out)
+  features/debug/           # debug builds only (kDebugMode in main.dart): floating bug button
+    domain/                 # GpsSimulation, RouteSimulator (pure route → GPS fixes), DebugTools port
+    data/                   # SimulatedLocationTracker, VirtualClock (sped-up time), DebugHttpClient
+    presentation/           # DebugOverlay (draggable button), DebugPanel, DebugCubit
   features/photo_share/     # put route + stats on a photo / transparent sticker
     domain/                 # RouteShape (track → unit-box polyline), PhotoSource + ImageSink ports
     data/                   # image_picker, gal (save to gallery), share_plus
