@@ -13,6 +13,13 @@ class FakeServer {
   final List<http.BaseRequest> requests = [];
   final List<Map<String, Object?>> uploads = [];
 
+  /// v1.2 records by resource (`shoes`, `workouts`): id → API object plus
+  /// `_serverUpdatedAt`.
+  final Map<String, Map<String, Map<String, Object?>>> records = {
+    'shoes': {},
+    'workouts': {},
+  };
+
   /// photoId → {activityId, takenAt, bytes}
   final Map<String, Map<String, Object?>> photos = {};
   Map<String, Object?> profile = {
@@ -20,6 +27,9 @@ class FakeServer {
     'email': 'a@b.co',
     'displayName': null,
     'weightKg': null,
+    'heightCm': null,
+    'birthYear': null,
+    'maxHrBpm': null,
   };
   String validAccessToken = 'access-1';
   String validRefreshToken = 'refresh-1';
@@ -47,6 +57,19 @@ class FakeServer {
     };
     activities[activityId]!['_serverUpdatedAt'] = ++_clock;
   }
+
+  /// Adds a shoe or workout as if another device had saved it.
+  void seedRecord(String resource, Map<String, Object?> body) =>
+      records[resource]![body['id']! as String] = {
+        ...body,
+        'deletedAt': null,
+        '_serverUpdatedAt': ++_clock,
+      };
+
+  List<Map<String, Object?>> live(String resource) => [
+    for (final r in records[resource]!.values)
+      if (r['deletedAt'] == null) _public(r),
+  ];
 
   int _photoCount(String activityId) =>
       photos.values.where((p) => p['activityId'] == activityId).length;
@@ -101,6 +124,11 @@ class FakeServer {
         profile = {...profile, ...body};
       }
       return _json(200, profile);
+    }
+
+    final record = RegExp(r'^/(shoes|workouts)(?:/([^/]+))?$').firstMatch(path);
+    if (record != null) {
+      return _record(request, record.group(1)!, record.group(2));
     }
 
     if (path == '/challenges/current') {
@@ -206,6 +234,54 @@ class FakeServer {
     }
     return _json(200, {..._summary(stored), 'segments': stored['segments']});
   }
+
+  /// docs/api.md v1.2: upsert with last-write-wins, soft delete, feed.
+  http.Response _record(http.Request request, String resource, String? id) {
+    final store = records[resource]!;
+    if (id == null) {
+      final since = request.url.queryParameters['updatedSince'];
+      final sinceClock = since == null || since.startsWith('1970')
+          ? 0
+          : int.parse(since);
+      return _json(200, {
+        'items': [
+          for (final r in store.values)
+            if ((r['_serverUpdatedAt']! as int) > sinceClock) _public(r),
+        ],
+        'nextCursor': null,
+        'serverTime': '$_clock',
+      });
+    }
+    final stored = store[id];
+    if (request.method == 'DELETE') {
+      if (stored != null && stored['deletedAt'] == null) {
+        stored['deletedAt'] = '2026-10-12T00:00:00.000Z';
+        stored['_serverUpdatedAt'] = ++_clock;
+      }
+      return http.Response('', 204);
+    }
+    final body = jsonDecode(request.body) as Map<String, Object?>;
+    if (stored != null &&
+        (stored['deletedAt'] != null ||
+            (body['updatedAt']! as String).compareTo(
+                  stored['updatedAt']! as String,
+                ) <
+                0)) {
+      return _json(200, _public(stored));
+    }
+    store[id] = {
+      ...body,
+      'id': id,
+      'deletedAt': null,
+      '_serverUpdatedAt': ++_clock,
+    };
+    return _json(200, _public(store[id]!));
+  }
+
+  static Map<String, Object?> _public(Map<String, Object?> r) => {
+    for (final e in r.entries)
+      if (!e.key.startsWith('_')) e.key: e.value,
+  };
 
   Map<String, Object?> _summary(Map<String, Object?> a) => {
     for (final e in a.entries)

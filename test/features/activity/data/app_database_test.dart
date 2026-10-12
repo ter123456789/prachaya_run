@@ -1,7 +1,9 @@
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:prachaya_run/core/storage/kv_store.dart';
 import 'package:prachaya_run/features/activity/data/datasources/app_database.dart';
+import 'package:prachaya_run/features/auth/data/sync/profile_store.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 void main() {
@@ -74,5 +76,85 @@ void main() {
     final points = await db.query('track_points');
     expect(points, hasLength(3));
     expect(points.every((p) => p['activity_id'] == row['id']), isTrue);
+  });
+
+  test('v3 → v4 keeps every row and adds shoes and planned workouts', () async {
+    final dir = Directory.systemTemp.createTempSync('prachaya_db');
+    addTearDown(() => dir.deleteSync(recursive: true));
+    final path = '${dir.path}/test.db';
+    // Build a v3 database through the real v1–v3 migrations, then add data.
+    final v3 = await factory.openDatabase(
+      path,
+      options: OpenDatabaseOptions(
+        version: 3,
+        onCreate: (db, _) async {
+          await db.execute('''
+            CREATE TABLE activities (id TEXT PRIMARY KEY, type TEXT NOT NULL,
+              title TEXT NOT NULL, started_at INTEGER NOT NULL,
+              ended_at INTEGER NOT NULL, moving_time_ms INTEGER NOT NULL,
+              distance_m REAL NOT NULL, elevation_gain_m REAL NOT NULL,
+              updated_at INTEGER NOT NULL DEFAULT 0, deleted_at INTEGER,
+              synced INTEGER NOT NULL DEFAULT 0,
+              has_track INTEGER NOT NULL DEFAULT 1, owner_id TEXT,
+              photo_count INTEGER NOT NULL DEFAULT 0,
+              photos_stale INTEGER NOT NULL DEFAULT 0)''');
+          await db.execute('''
+            CREATE TABLE track_points (activity_id TEXT NOT NULL
+                REFERENCES activities(id) ON DELETE CASCADE,
+              segment INTEGER NOT NULL, seq INTEGER NOT NULL,
+              lat REAL NOT NULL, lng REAL NOT NULL, altitude REAL,
+              accuracy REAL, timestamp INTEGER NOT NULL,
+              PRIMARY KEY (activity_id, segment, seq))''');
+          await db.execute(
+            'CREATE TABLE sync_state (key TEXT PRIMARY KEY, value TEXT NOT NULL)',
+          );
+          await db.execute('''
+            CREATE TABLE activity_photos (id TEXT PRIMARY KEY,
+              activity_id TEXT NOT NULL, owner_id TEXT, local_path TEXT,
+              taken_at INTEGER NOT NULL, synced INTEGER NOT NULL DEFAULT 0,
+              deleted_at INTEGER)''');
+          await db.execute(
+            'CREATE TABLE kv (key TEXT PRIMARY KEY, value TEXT NOT NULL)',
+          );
+          await db.insert('activities', {
+            'id': '3f2b8c1e-9d4a-4b7e-8f21-6c0d5e9a1b23',
+            'type': 'run',
+            'title': 'v3 run',
+            'started_at': 1000,
+            'ended_at': 5000,
+            'moving_time_ms': 4000,
+            'distance_m': 2500.0,
+            'elevation_gain_m': 3.0,
+            'updated_at': 5000,
+            'synced': 1,
+            'owner_id': 'u1',
+          });
+          // A v3 profile cache (server copy, no bookkeeping fields).
+          await db.insert('kv', {
+            'key': 'profile:u1',
+            'value':
+                '{"id":"u1","email":"a@b.co","displayName":"ปราชญา",'
+                '"weightKg":70}',
+          });
+        },
+      ),
+    );
+    await v3.close();
+
+    final db = await AppDatabase.open(factory: factory, path: path);
+    addTearDown(db.close);
+
+    final row = (await db.query('activities')).single;
+    expect(row['title'], 'v3 run');
+    expect(row['synced'], 1);
+    expect(row['shoe_id'], isNull);
+    expect(await db.query(AppDatabase.shoesTable), isEmpty);
+    expect(await db.query(AppDatabase.workoutsTable), isEmpty);
+
+    // The old profile cache still reads, as a clean server copy.
+    final stored = await ProfileStore(KvStore(db)).read('u1');
+    expect(stored!.profile.displayName, 'ปราชญา');
+    expect(stored.profile.weightKg, 70);
+    expect(stored.dirty, isFalse);
   });
 }

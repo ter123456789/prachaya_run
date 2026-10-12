@@ -14,6 +14,8 @@ import '../../../../core/widgets/status_pill.dart';
 import '../../domain/entities/activity_type.dart';
 import '../../domain/entities/route_shape.dart';
 import '../../domain/services/live_metrics.dart';
+import '../../../../core/units/unit_labels.dart';
+import '../../../athlete/presentation/units.dart';
 import '../activity_labels.dart';
 import '../activity_refresh.dart';
 import '../bloc/record/record_bloc.dart';
@@ -233,8 +235,9 @@ class _TrackPanelState extends State<_TrackPanel> {
                   top: 12,
                   child: StatusPill(
                     text: state.type.usesPace
-                        ? "${formatPaceQuote(live)} LIVE PACE"
-                        : '${formatSpeedKmh(live)} KM/H LIVE',
+                        ? '${context.units.paceQuote(live)} LIVE PACE'
+                        : '${context.units.speed(live)} '
+                              '${context.units.unit.latinSpeed} LIVE',
                     dotColor: AppColors.lime,
                     mono: true,
                     color: AppColors.lime,
@@ -360,15 +363,17 @@ class _Tiles extends StatelessWidget {
         _Tile(
           label: state.type.usesPace ? 'เพซเฉลี่ย' : 'ความเร็ว',
           value: state.type.usesPace
-              ? formatPace(speed)
-              : formatSpeedKmh(speed),
-          unit: state.type.usesPace ? '/กม.' : 'กม./ชม.',
+              ? context.units.pace(speed)
+              : context.units.speed(speed),
+          unit: state.type.usesPace
+              ? context.units.paceUnit
+              : context.units.speedUnit,
         ),
         const SizedBox(width: 10),
         _Tile(
           label: 'ระยะทาง',
-          value: formatDistanceKm(state.distanceMeters),
-          unit: 'กม.',
+          value: context.units.distance(state.distanceMeters),
+          unit: context.units.distanceUnit,
           color: AppColors.lime,
         ),
         const SizedBox(width: 10),

@@ -26,6 +26,7 @@ abstract final class ActivityRowMapper {
     'synced': 0,
     'has_track': 1,
     'owner_id': ownerId,
+    'shoe_id': a.shoeId,
   };
 
   /// A row matching the server's copy. [hasTrack] says whether the GPS
@@ -49,6 +50,7 @@ abstract final class ActivityRowMapper {
     'has_track': hasTrack ? 1 : 0,
     'owner_id': ownerId,
     'photo_count': s.photoCount,
+    'shoe_id': s.shoeId,
   };
 
   static Iterable<Row> pointsToRows(Activity a) sync* {
@@ -78,6 +80,7 @@ abstract final class ActivityRowMapper {
     movingTime: Duration(milliseconds: row['moving_time_ms']! as int),
     distanceMeters: (row['distance_m']! as num).toDouble(),
     elevationGainMeters: (row['elevation_gain_m']! as num).toDouble(),
+    shoeId: row['shoe_id'] as String?,
   );
 
   /// [pointRows] must be ordered by segment, then seq.
@@ -108,6 +111,7 @@ abstract final class ActivityRowMapper {
       endedAt: _time(row['ended_at']),
       movingTime: Duration(milliseconds: row['moving_time_ms']! as int),
       segments: segments,
+      shoeId: row['shoe_id'] as String?,
     );
   }
 

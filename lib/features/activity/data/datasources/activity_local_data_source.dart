@@ -105,6 +105,19 @@ class ActivityLocalDataSource {
     return ActivityRowMapper.activityFromRows(rows.first, points);
   }
 
+  /// Links [id] to [shoeId] as a local edit stamped [at] (synced later).
+  Future<void> setShoe(String id, String? shoeId, {required DateTime at}) =>
+      _db.update(
+        _activities,
+        {
+          'shoe_id': shoeId,
+          'updated_at': at.millisecondsSinceEpoch,
+          'synced': 0,
+        },
+        where: 'id = ? AND deleted_at IS NULL',
+        whereArgs: [id],
+      );
+
   /// Keeps a tombstone until the server confirms the delete.
   Future<void> markDeleted(String id, {required DateTime at}) {
     return _db.transaction((txn) async {

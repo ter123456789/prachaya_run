@@ -26,14 +26,6 @@ String defaultActivityTitle(ActivityType type, DateTime startedAt) {
   return '${type.label}${timeOfDayPeriod(startedAt)}';
 }
 
-/// Pace in the share/telemetry style: `5'01"`.
-String formatPaceQuote(double speedMps) {
-  final p = formatPace(speedMps);
-  if (!p.contains(':')) return p;
-  final parts = p.split(':');
-  return "${parts[0]}'${parts[1]}\"";
-}
-
 extension EffortLabels on Effort {
   String tag(ActivityType type) {
     final sport = switch (type) {

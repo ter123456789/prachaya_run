@@ -8,17 +8,31 @@ Personal Strava-style tracker (run / ride / hike) in Flutter. UI text is Thai.
 lib/
   main.dart                 # composition root: the only place that builds concrete impls
   app.dart                  # providers + MaterialApp
-  core/                     # shared helpers (formatters)
+  core/                     # shared helpers (formatters, Thai dates)
     network/                # ApiClient (JSON, gzip, token refresh), TokenStore, API_BASE_URL
+    sync/                   # SyncParticipant port, SyncedRecordStore + RecordSyncParticipant
+                            #   (generic offline-first records: shoes, planned workouts)
+    units/                  # DistanceUnit (km/mi) math + Thai/Latin unit labels
   features/activity/
     domain/                 # PURE DART: entities, ports, use cases
     data/                   # sqflite + geolocator implementations of the ports
       sync/                 # ActivitySyncEngine: push pending changes, pull updatedSince feed
     presentation/           # BLoC/Cubit (flutter_bloc), pages, widgets
-  features/auth/            # email + password account (own JWT on rinning_API)
-    domain/                 # AuthUser, AuthRepository port, credential checks
-    data/                   # HttpAuthRepository
-    presentation/           # AuthCubit, AccountPage (sign in/up, sync now, sign out)
+  features/auth/            # email + password account (own JWT on rinning_API) + the profile
+    domain/                 # AuthUser, UserProfile, Auth/ProfileRepository ports, validation
+    data/                   # HttpAuthRepository, LocalFirstProfileRepository, ProfileStore/ProfileSync
+    presentation/           # AuthCubit, ProfileCubit, AccountPage (sign in/up, sync, sign out, delete)
+  features/athlete/         # Stitch 08 profile: body data, HR zones, all-time stats, shoes, units
+    domain/                 # Shoe, ShoeRepository/SettingsRepository ports, heart_rate_zones
+                            #   (Tanaka), body_metrics (BMI), all_time_stats, shoe_usage
+    data/                   # OfflineFirstShoeRepository, KvSettingsRepository, ShoeJsonMapper
+    presentation/           # ProfilePage, GearCubit, UnitsCubit, `context.units` (UnitFormat),
+                            #   HeartRateZonesCard, ProfileEditSheet, ShoeSheet
+  features/training/        # Stitch 09 schedule + 10 new-workout sheet
+    domain/                 # PlannedWorkout, WorkoutRepository port, workout_plan (templates,
+                            #   phases, estimate, TrainingWeek, completion), CompleteWorkoutForActivity
+    data/                   # OfflineFirstWorkoutRepository, WorkoutJsonMapper
+    presentation/           # SchedulePage, WorkoutSheet, TrainingTeaser, TrainingCubit, WorkoutDraftCubit
   features/debug/           # debug builds only (kDebugMode in main.dart): floating bug button
     domain/                 # GpsSimulation, RouteSimulator (pure route → GPS fixes), DebugTools port
     data/                   # SimulatedLocationTracker, VirtualClock (sped-up time), DebugHttpClient
@@ -37,7 +51,10 @@ Rules (enforced for every feature by `test/architecture_test.dart`):
 - Cross-feature imports go to the same layer or inward (photo_share → activity domain entities
   and activity presentation labels), never outward.
 - DB rows ↔ entities mapping lives only in `data/models/activity_row_mapper.dart`; API JSON ↔
-  entities only in `data/models/activity_json_mapper.dart`.
+  entities only in `data/models/activity_json_mapper.dart`. Shoes, workouts and the profile have
+  their own `*_json_mapper.dart` (the record store keeps their API JSON as-is in `data`).
+- Cross-feature hooks go through domain typedefs, composed in `app.dart`: `SaveActivity` takes a
+  `DefaultShoe` (primary shoe for runs/hikes) and `onSaved` hooks (CompleteWorkoutForActivity).
 - Add a use case only when it holds logic (e.g. `SaveActivity` validates distance).
   Simple reads/deletes go straight from cubit to the repository port.
 
@@ -49,6 +66,13 @@ Rules (enforced for every feature by `test/architecture_test.dart`):
   Activity ids are client UUIDs (`uuidV4`). An account is optional; signed out, nothing is sent.
 - Rows are scoped by `owner_id`: an account sees its own rows plus unclaimed ones (recorded signed
   out, `owner_id IS NULL`), which its next sync claims. Other accounts' rows stay on disk, hidden.
+- DB v4 adds `activities.shoe_id` and the `shoes` / `planned_workouts` tables (id, owner_id,
+  data JSON, updated_at, deleted_at, synced — same scoping, LWW and tombstones as activities).
+  The profile is in `kv` (`profile:<userId>`, `profile:local` while signed out, `_dirty` flag).
+- Sync order: claimUnowned → push → pull → photos → participants (ProfileSync, /shoes, /workouts).
+  ProfileSync PATCHes every field when dirty (so clearing reaches the server), else GETs `/me`;
+  a signed-out profile fills the account's empty fields on first sign-in. Multiple primary shoes
+  (two offline devices) resolve to the most recently edited one; unknown shoeIds count as none.
 - DB v3 adds `activity_photos` (offline-first photos, files named by photo id under app docs `photos/`),
   `activities.photo_count/photos_stale`, and a `kv` JSON cache (profile, challenge, weather).
 - DB v2 columns: `updated_at` (last-write-wins), `deleted_at` (tombstone until DELETE succeeds),
@@ -70,7 +94,15 @@ Rules (enforced for every feature by `test/architecture_test.dart`):
   AvatarButton, SectionHeader, FloatingDock + OrbButton, Shimmer, EdgeFade, FadeSlideIn, FadeIndexedStack.
   `features/activity/presentation/widgets/route_canvas.dart` draws the self-animating luminescent route.
 - Not in the app on purpose: heart rate (no sensor; detail shows estimated calories instead),
-  notification bell, place names.
+  notification bell, place names. Profile 08 hides resting HR, VO2 Max, fitness age, sensors,
+  Strava/Apple Health and route privacy; schedule 09 hides multi-week plan names, best-time
+  windows and run reminders — no data source. Never show the design's sample values.
+- HR zones: Max HR = user value, else Tanaka `208 − 0.7 × age` (birth year typed in พ.ศ. or ค.ศ.);
+  zones 1–5 = 50–60 … 90–100 % (ceil of each lower bound, no overlap). Focus zone 2.
+- Units: `UnitsCubit` (device setting in `kv`) → `context.units` everywhere (distance, pace, speed,
+  splits, wind, share image). Plans store pace per km; shown per the chosen unit.
+- Navigation: avatar → ProfilePage (works signed out) → sync strip / buttons → AccountPage.
+  Dashboard has a "ตารางซ้อม" teaser below the latest activity → SchedulePage.
 - Motion: entrance staggers, count-ups, ring/bar sweeps, sliding tabs, press springs, haptics. Every
   looping animation stops under OS "remove animations" (widget tests run with it on so pumpAndSettle ends).
 - Font files in `assets/fonts/` (OFL). Launch: native splash `#0C0D0B`, then `core/splash/SplashPage`.

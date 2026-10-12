@@ -12,6 +12,7 @@ class Activity {
     required this.endedAt,
     required this.movingTime,
     required List<List<TrackPoint>> segments,
+    this.shoeId,
   }) : segments = List<List<TrackPoint>>.unmodifiable(
          segments.map(List<TrackPoint>.unmodifiable),
        );
@@ -24,6 +25,9 @@ class Activity {
   final Duration movingTime;
   final List<List<TrackPoint>> segments;
 
+  /// The shoe this activity counts toward; null when none is linked.
+  final String? shoeId;
+
   late final double distanceMeters = _computeDistance();
   late final double elevationGainMeters = _computeElevationGain();
 
@@ -35,6 +39,19 @@ class Activity {
     movingTime: movingTime,
     distanceMeters: distanceMeters,
     elevationGainMeters: elevationGainMeters,
+    shoeId: shoeId,
+  );
+
+  /// The same activity linked to [shoeId] (null unlinks it).
+  Activity withShoe(String? shoeId) => Activity(
+    id: id,
+    type: type,
+    title: title,
+    startedAt: startedAt,
+    endedAt: endedAt,
+    movingTime: movingTime,
+    segments: segments,
+    shoeId: shoeId,
   );
 
   /// Splits of [every] meters, timed by GPS timestamps (pauses excluded).
@@ -112,6 +129,7 @@ class ActivitySummary {
     required this.movingTime,
     required this.distanceMeters,
     required this.elevationGainMeters,
+    this.shoeId,
   });
 
   final String id;
@@ -121,6 +139,7 @@ class ActivitySummary {
   final Duration movingTime;
   final double distanceMeters;
   final double elevationGainMeters;
+  final String? shoeId;
 
   double get averageSpeedMps => _speed(distanceMeters, movingTime);
 }

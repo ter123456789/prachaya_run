@@ -26,6 +26,9 @@ void main() {
         authRepository: FakeAuthRepository(),
         profileRepository: FakeProfileRepository(),
         photoRepository: InMemoryPhotoRepository(),
+        shoeRepository: InMemoryShoeRepository(),
+        workoutRepository: InMemoryWorkoutRepository(),
+        settingsRepository: InMemorySettingsRepository(),
         locationTracker: FakeLocationTracker(),
         photoSource: FakePhotoSource(),
         imageSink: FakeImageSink(),
@@ -138,7 +141,11 @@ void main() {
     tester,
   ) async {
     await pumpApp(tester, InMemoryActivityRepository());
+    // The avatar opens the profile; its sync strip leads to the account.
     await tester.tap(find.byTooltip('บัญชี').first);
+    await tester.pumpAndSettle();
+    expect(find.text('ข้อมูลผู้ใช้'), findsOneWidget);
+    await tester.tap(find.text('เข้าสู่ระบบเพื่อซิงก์'));
     await tester.pumpAndSettle();
 
     expect(find.text('ซิงก์กิจกรรมข้ามเครื่อง'), findsOneWidget);

@@ -61,6 +61,17 @@ class OfflineFirstActivityRepository implements ActivityRepository {
     _sync.schedule();
   }
 
+  /// An activity pulled from another device gets its track first, since an
+  /// upload always carries the whole track.
+  @override
+  Future<void> setShoe(String id, String? shoeId) async {
+    final state = await _local.syncState(id);
+    if (state == null || state.deleted || !await _visible(state)) return;
+    if (!state.hasTrack && await _sync.downloadTrack(id) == null) return;
+    await _local.setShoe(id, shoeId, at: _clock());
+    _sync.schedule();
+  }
+
   Future<bool> _visible(LocalSyncState state) async =>
       state.ownerId == null || state.ownerId == await _owner();
 }

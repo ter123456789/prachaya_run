@@ -15,6 +15,7 @@ abstract final class ActivityJsonMapper {
     'endedAt': time(a.endedAt),
     'movingTimeMs': a.movingTime.inMilliseconds,
     'updatedAt': time(updatedAt),
+    'shoeId': a.shoeId,
     'segments': [
       for (final segment in a.segments)
         [
@@ -44,6 +45,7 @@ abstract final class ActivityJsonMapper {
     elevationGainMeters: (json['elevationGainM']! as num).toDouble(),
     deletedAt: json['deletedAt'] == null ? null : parseTime(json['deletedAt']),
     photoCount: (json['photoCount'] as num?)?.toInt() ?? 0,
+    shoeId: json['shoeId'] as String?,
   );
 
   static RemotePhoto photoFromJson(Json json) => RemotePhoto(
@@ -59,6 +61,7 @@ abstract final class ActivityJsonMapper {
     startedAt: parseTime(json['startedAt']),
     endedAt: parseTime(json['endedAt']),
     movingTime: Duration(milliseconds: (json['movingTimeMs']! as num).toInt()),
+    shoeId: json['shoeId'] as String?,
     segments: [
       for (final segment in json['segments']! as List<Object?>)
         [

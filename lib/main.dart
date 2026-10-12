@@ -10,6 +10,8 @@ import 'core/network/api_client.dart';
 import 'core/network/api_config.dart';
 import 'core/network/token_store.dart';
 import 'core/storage/kv_store.dart';
+import 'core/sync/record_sync_participant.dart';
+import 'core/sync/synced_record_store.dart';
 import 'features/activity/data/datasources/activity_local_data_source.dart';
 import 'features/activity/data/datasources/activity_remote_data_source.dart';
 import 'features/activity/data/datasources/app_database.dart';
@@ -21,13 +23,18 @@ import 'features/activity/data/services/geolocator_location_tracker.dart';
 import 'features/activity/data/services/open_meteo_weather_service.dart';
 import 'features/activity/data/sync/activity_sync_engine.dart';
 import 'features/auth/data/repositories/http_auth_repository.dart';
-import 'features/auth/data/repositories/http_profile_repository.dart';
+import 'features/athlete/data/repositories/kv_settings_repository.dart';
+import 'features/athlete/data/repositories/offline_first_shoe_repository.dart';
+import 'features/auth/data/repositories/local_first_profile_repository.dart';
+import 'features/auth/data/sync/profile_store.dart';
+import 'features/auth/data/sync/profile_sync.dart';
 import 'features/debug/data/debug_http_client.dart';
 import 'features/debug/data/device_debug_tools.dart';
 import 'features/debug/data/simulated_location_tracker.dart';
 import 'features/debug/data/virtual_clock.dart';
 import 'features/photo_share/data/services/device_image_sink.dart';
 import 'features/photo_share/data/services/image_picker_photo_source.dart';
+import 'features/training/data/repositories/offline_first_workout_repository.dart';
 
 /// Composition root: the only place that knows concrete implementations.
 /// Debug-only tools sit behind `kDebugMode`, so release builds drop them.
@@ -47,11 +54,19 @@ Future<void> main() async {
     database,
     Directory('${(await getApplicationDocumentsDirectory()).path}/photos'),
   );
+  final profiles = ProfileStore(kv);
+  final shoes = SyncedRecordStore(database, AppDatabase.shoesTable);
+  final workouts = SyncedRecordStore(database, AppDatabase.workoutsTable);
   final sync = ActivitySyncEngine(
     local: local,
     remote: ActivityRemoteDataSource(api),
     photos: photos,
     tokens: tokens,
+    participants: [
+      ProfileSync(profiles, api),
+      RecordSyncParticipant(shoes, api, path: '/shoes'),
+      RecordSyncParticipant(workouts, api, path: '/workouts'),
+    ],
   );
   final activities = OfflineFirstActivityRepository(
     local,
@@ -76,9 +91,27 @@ Future<void> main() async {
         onAccountDeleted: (userId) async {
           await local.purgeOwner(userId);
           await photos.pruneOrphans();
+          await shoes.purgeOwner(userId);
+          await workouts.purgeOwner(userId);
+          await profiles.remove(userId);
         },
       ),
-      profileRepository: HttpProfileRepository(api, tokens, kv),
+      profileRepository: LocalFirstProfileRepository(
+        profiles,
+        tokens,
+        scheduleSync: sync.schedule,
+      ),
+      shoeRepository: OfflineFirstShoeRepository(
+        shoes,
+        tokens,
+        scheduleSync: sync.schedule,
+      ),
+      workoutRepository: OfflineFirstWorkoutRepository(
+        workouts,
+        tokens,
+        scheduleSync: sync.schedule,
+      ),
+      settingsRepository: KvSettingsRepository(kv),
       photoRepository: OfflineFirstPhotoRepository(photos, sync, tokens),
       challengeRepository: HttpChallengeRepository(api, tokens, kv),
       weatherService: OpenMeteoWeatherService(http.Client(), kv),

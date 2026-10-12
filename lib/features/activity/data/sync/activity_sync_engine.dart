@@ -3,6 +3,7 @@ import 'dart:io';
 
 import '../../../../core/network/api_client.dart';
 import '../../../../core/network/token_store.dart';
+import '../../../../core/sync/sync_participant.dart';
 import '../../domain/entities/activity.dart';
 import '../../domain/services/activity_sync.dart';
 import '../datasources/activity_local_data_source.dart';
@@ -12,16 +13,21 @@ import '../datasources/photo_local_data_source.dart';
 /// Pushes local changes, then pulls the server's change feed
 /// (docs/api.md, "Pull sync"). One run at a time; a request made during a
 /// run starts one more run after it, so no change is left behind.
+///
+/// After activities and photos it syncs each [SyncParticipant] (profile,
+/// shoes, planned workouts) in the same run.
 class ActivitySyncEngine implements ActivitySync {
   ActivitySyncEngine({
     required ActivityLocalDataSource local,
     required ActivityRemoteDataSource remote,
     required PhotoLocalDataSource photos,
     required TokenStore tokens,
+    List<SyncParticipant> participants = const [],
   }) : _local = local,
        _remote = remote,
        _photos = photos,
-       _tokens = tokens;
+       _tokens = tokens,
+       _participants = participants;
 
   static const _epoch = '1970-01-01T00:00:00.000Z';
 
@@ -29,6 +35,7 @@ class ActivitySyncEngine implements ActivitySync {
   final ActivityRemoteDataSource _remote;
   final PhotoLocalDataSource _photos;
   final TokenStore _tokens;
+  final List<SyncParticipant> _participants;
   final _changes = StreamController<void>.broadcast();
 
   Future<SyncOutcome>? _running;
@@ -50,8 +57,14 @@ class ActivitySyncEngine implements ActivitySync {
   @override
   Future<int> pendingCount() async {
     final session = await _tokens.read();
-    if (session == null) return _local.unclaimedCount();
-    return (await _local.pendingChanges(ownerId: session.userId)).length;
+    final userId = session?.userId;
+    var count = userId == null
+        ? await _local.unclaimedCount()
+        : (await _local.pendingChanges(ownerId: userId)).length;
+    for (final p in _participants) {
+      count += await p.pendingCount(userId);
+    }
+    return count;
   }
 
   /// Fire-and-forget sync after a local save or delete.
@@ -92,9 +105,15 @@ class ActivitySyncEngine implements ActivitySync {
     try {
       await _local.claimUnowned(session.userId);
       await _photos.claimUnowned(session.userId);
+      for (final p in _participants) {
+        await p.claimUnowned(session.userId);
+      }
       await _push(session.userId, mark);
       await _pull(session.userId, mark);
       await _syncPhotos(session.userId, mark);
+      for (final p in _participants) {
+        mark(await p.sync(session.userId));
+      }
       return SyncOutcome.synced;
     } on NetworkException {
       return SyncOutcome.offline;

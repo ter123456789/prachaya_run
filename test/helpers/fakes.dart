@@ -11,6 +11,14 @@ import 'package:prachaya_run/features/auth/domain/entities/auth_user.dart';
 import 'package:prachaya_run/features/auth/domain/repositories/auth_repository.dart';
 import 'package:prachaya_run/features/auth/domain/entities/user_profile.dart';
 import 'package:prachaya_run/features/auth/domain/repositories/profile_repository.dart';
+import 'package:prachaya_run/features/auth/domain/services/profile_validation.dart';
+import 'package:prachaya_run/core/units/distance_unit.dart';
+import 'package:prachaya_run/features/athlete/domain/entities/shoe.dart';
+import 'package:prachaya_run/features/athlete/domain/repositories/settings_repository.dart';
+import 'package:prachaya_run/features/athlete/domain/repositories/shoe_repository.dart';
+import 'package:prachaya_run/features/training/domain/entities/planned_workout.dart';
+import 'package:prachaya_run/features/training/domain/repositories/workout_repository.dart';
+import 'package:prachaya_run/features/training/domain/services/workout_plan.dart';
 import 'package:prachaya_run/features/activity/domain/entities/activity_photo.dart';
 import 'package:prachaya_run/features/activity/domain/repositories/activity_photo_repository.dart';
 import 'package:prachaya_run/features/debug/domain/entities/gps_simulation.dart';
@@ -71,6 +79,12 @@ class InMemoryActivityRepository implements ActivityRepository {
 
   @override
   Future<void> delete(String id) async => store.remove(id);
+
+  @override
+  Future<void> setShoe(String id, String? shoeId) async {
+    final a = store[id];
+    if (a != null) store[id] = a.withShoe(shoeId);
+  }
 }
 
 class FakeActivitySync implements ActivitySync {
@@ -169,20 +183,70 @@ class FakeDebugTools implements DebugTools {
 }
 
 class FakeProfileRepository implements ProfileRepository {
-  UserProfile? profile = const UserProfile();
+  UserProfile profile = const UserProfile();
 
   @override
-  Future<UserProfile?> load() async => profile;
+  Future<UserProfile> load() async => profile;
 
   @override
-  Future<UserProfile> update({
-    String? displayName,
-    double? weightKg,
-    bool clearWeight = false,
-  }) async => profile = UserProfile(
-    displayName: displayName ?? profile?.displayName,
-    weightKg: clearWeight ? null : weightKg ?? profile?.weightKg,
-  );
+  Future<UserProfile> save(UserProfile p) async {
+    final invalid = validateProfile(p, currentYear: 2026);
+    if (invalid.isNotEmpty) throw ProfileValidationException(invalid);
+    return profile = p;
+  }
+}
+
+class InMemoryShoeRepository implements ShoeRepository {
+  final Map<String, Shoe> store = {};
+
+  @override
+  Future<List<Shoe>> getAll() async => store.values.toList();
+
+  @override
+  Future<void> save(Shoe shoe) async {
+    if (!isValidShoe(shoe)) throw const ShoeValidationException();
+    if (shoe.primary) {
+      for (final e in store.entries.toList()) {
+        if (e.key != shoe.id) store[e.key] = e.value.copyWith(primary: false);
+      }
+    }
+    store[shoe.id] = shoe;
+  }
+
+  @override
+  Future<void> delete(String id) async => store.remove(id);
+
+  @override
+  Future<Shoe?> primary() async =>
+      store.values.where((s) => s.primary && !s.retired).firstOrNull;
+}
+
+class InMemoryWorkoutRepository implements WorkoutRepository {
+  final Map<String, PlannedWorkout> store = {};
+
+  @override
+  Future<List<PlannedWorkout>> getAll() async =>
+      store.values.toList()
+        ..sort((a, b) => a.scheduledAt.compareTo(b.scheduledAt));
+
+  @override
+  Future<void> save(PlannedWorkout w) async {
+    if (!isValidWorkout(w)) throw const WorkoutValidationException();
+    store[w.id] = w;
+  }
+
+  @override
+  Future<void> delete(String id) async => store.remove(id);
+}
+
+class InMemorySettingsRepository implements SettingsRepository {
+  DistanceUnit unit = DistanceUnit.km;
+
+  @override
+  Future<DistanceUnit> distanceUnit() async => unit;
+
+  @override
+  Future<void> setDistanceUnit(DistanceUnit u) async => unit = u;
 }
 
 class InMemoryPhotoRepository implements ActivityPhotoRepository {

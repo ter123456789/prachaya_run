@@ -6,6 +6,7 @@ import 'core/theme/app_theme.dart';
 import 'features/activity/domain/repositories/activity_photo_repository.dart';
 import 'features/activity/domain/repositories/activity_repository.dart';
 import 'features/activity/domain/repositories/challenge_repository.dart';
+import 'features/activity/domain/entities/activity_type.dart';
 import 'features/activity/domain/services/activity_sync.dart';
 import 'features/activity/domain/services/location_tracker.dart';
 import 'features/activity/domain/services/weather_service.dart';
@@ -16,6 +17,10 @@ import 'features/activity/presentation/bloc/history/history_cubit.dart';
 import 'features/activity/presentation/bloc/record/record_bloc.dart';
 import 'features/activity/presentation/bloc/sync/sync_cubit.dart';
 import 'features/activity/presentation/pages/home_page.dart';
+import 'features/athlete/domain/repositories/settings_repository.dart';
+import 'features/athlete/domain/repositories/shoe_repository.dart';
+import 'features/athlete/presentation/bloc/gear_cubit.dart';
+import 'features/athlete/presentation/bloc/units_cubit.dart';
 import 'features/auth/domain/repositories/auth_repository.dart';
 import 'features/auth/domain/repositories/profile_repository.dart';
 import 'features/auth/presentation/bloc/auth_cubit.dart';
@@ -25,6 +30,9 @@ import 'features/debug/presentation/debug_cubit.dart';
 import 'features/debug/presentation/debug_overlay.dart';
 import 'features/photo_share/domain/services/image_sink.dart';
 import 'features/photo_share/domain/services/photo_source.dart';
+import 'features/training/domain/repositories/workout_repository.dart';
+import 'features/training/domain/usecases/complete_workout.dart';
+import 'features/training/presentation/bloc/training_cubit.dart';
 
 class PrachayaRunApp extends StatelessWidget {
   const PrachayaRunApp({
@@ -34,6 +42,9 @@ class PrachayaRunApp extends StatelessWidget {
     required this.authRepository,
     required this.profileRepository,
     required this.photoRepository,
+    required this.shoeRepository,
+    required this.workoutRepository,
+    required this.settingsRepository,
     this.challengeRepository,
     this.weatherService,
     required this.locationTracker,
@@ -50,6 +61,9 @@ class PrachayaRunApp extends StatelessWidget {
   final AuthRepository authRepository;
   final ProfileRepository profileRepository;
   final ActivityPhotoRepository photoRepository;
+  final ShoeRepository shoeRepository;
+  final WorkoutRepository workoutRepository;
+  final SettingsRepository settingsRepository;
   final ChallengeRepository? challengeRepository;
   final WeatherService? weatherService;
   final LocationTracker locationTracker;
@@ -77,7 +91,16 @@ class PrachayaRunApp extends StatelessWidget {
           BlocProvider(
             create: (_) => RecordBloc(
               locationTracker: locationTracker,
-              saveActivity: SaveActivity(activityRepository),
+              saveActivity: SaveActivity(
+                activityRepository,
+                // Runs and hikes count toward the primary shoe.
+                defaultShoe: (type) async => type == ActivityType.ride
+                    ? null
+                    : (await shoeRepository.primary())?.id,
+                onSaved: [
+                  (a) => CompleteWorkoutForActivity(workoutRepository)(a),
+                ],
+              ),
               clock: clock,
             ),
           ),
@@ -91,7 +114,16 @@ class PrachayaRunApp extends StatelessWidget {
           ),
           BlocProvider(create: (_) => SyncCubit(activitySync)),
           BlocProvider(create: (_) => AuthCubit(authRepository)..start()),
-          BlocProvider(create: (_) => ProfileCubit(profileRepository)),
+          BlocProvider(create: (_) => ProfileCubit(profileRepository)..load()),
+          BlocProvider(create: (_) => UnitsCubit(settingsRepository)..load()),
+          BlocProvider(
+            create: (_) =>
+                GearCubit(shoeRepository, activityRepository)..load(),
+          ),
+          BlocProvider(
+            create: (_) =>
+                TrainingCubit(workoutRepository, activityRepository)..load(),
+          ),
           if (debugTools case final tools?)
             BlocProvider(create: (_) => DebugCubit(tools)),
         ],
@@ -104,19 +136,20 @@ class PrachayaRunApp extends StatelessWidget {
                   prev.user != curr.user && curr.status != AuthStatus.unknown,
               listener: (context, state) {
                 context.refreshActivities();
-                final profile = context.read<ProfileCubit>();
+                // Signed out shows the device's own profile.
+                context.read<ProfileCubit>().load();
                 if (state.status == AuthStatus.signedIn) {
                   context.read<SyncCubit>().sync();
-                  profile.load();
-                } else {
-                  profile.clear();
                 }
               },
             ),
             // Activities pulled from other devices show up straight away.
             BlocListener<SyncCubit, SyncState>(
               listenWhen: (prev, curr) => prev.revision != curr.revision,
-              listener: (context, _) => context.refreshActivities(),
+              listener: (context, _) {
+                context.refreshActivities();
+                context.read<ProfileCubit>().load();
+              },
             ),
           ],
           child: MaterialApp(

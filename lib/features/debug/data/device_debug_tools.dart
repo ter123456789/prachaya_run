@@ -166,5 +166,9 @@ class DeviceDebugTools implements DebugTools {
     await txn.delete(AppDatabase.trackPointsTable);
     await txn.delete(AppDatabase.activitiesTable);
     await txn.delete(AppDatabase.syncStateTable);
+    await txn.delete(AppDatabase.shoesTable);
+    await txn.delete(AppDatabase.workoutsTable);
+    // Profiles and caches; the distance unit is a device setting and stays.
+    await txn.delete(AppDatabase.kvTable, where: "key <> 'settings'");
   });
 }

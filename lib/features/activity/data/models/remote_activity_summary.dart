@@ -15,6 +15,7 @@ class RemoteActivitySummary {
     required this.elevationGainMeters,
     this.deletedAt,
     this.photoCount = 0,
+    this.shoeId,
   });
 
   final String id;
@@ -28,6 +29,7 @@ class RemoteActivitySummary {
   final double elevationGainMeters;
   final DateTime? deletedAt;
   final int photoCount;
+  final String? shoeId;
 
   bool get isDeleted => deletedAt != null;
 }

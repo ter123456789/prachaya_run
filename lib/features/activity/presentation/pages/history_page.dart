@@ -20,6 +20,7 @@ import '../../domain/entities/activity_type.dart';
 import '../../domain/entities/monthly_summary.dart';
 import '../../domain/services/activity_sync.dart';
 import '../../domain/services/calories.dart';
+import '../../../athlete/presentation/units.dart';
 import '../activity_labels.dart';
 import '../activity_refresh.dart';
 import '../bloc/history/history_cubit.dart';
@@ -214,8 +215,10 @@ class _MonthCard extends StatelessWidget {
             children: [
               _MonthStat(
                 label: 'ระยะทางรวม',
-                value: (month.distanceMeters / 1000).toStringAsFixed(1),
-                unit: 'กม.',
+                value: context.units
+                    .distanceValue(month.distanceMeters)
+                    .toStringAsFixed(1),
+                unit: context.units.distanceUnit,
               ),
               const SizedBox(width: 8),
               _MonthStat(
@@ -376,15 +379,17 @@ class _ActivityCard extends StatelessWidget {
                   icon: Icons.speed_rounded,
                   label: summary.type.usesPace ? 'เพซ' : 'ความเร็ว',
                   value: summary.type.usesPace
-                      ? formatPace(speed)
-                      : formatSpeedKmh(speed),
-                  unit: summary.type.usesPace ? '/กม.' : 'กม./ชม.',
+                      ? context.units.pace(speed)
+                      : context.units.speed(speed),
+                  unit: summary.type.usesPace
+                      ? context.units.paceUnit
+                      : context.units.speedUnit,
                 ),
                 _Metric(
                   icon: Icons.route_rounded,
                   label: 'ระยะทาง',
-                  value: formatDistanceKm(summary.distanceMeters),
-                  unit: 'กม.',
+                  value: context.units.distance(summary.distanceMeters),
+                  unit: context.units.distanceUnit,
                 ),
                 _Metric(
                   icon: Icons.timer_outlined,

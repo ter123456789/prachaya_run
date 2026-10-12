@@ -1,4 +1,8 @@
-String formatDistanceKm(double meters) => (meters / 1000).toStringAsFixed(2);
+import 'units/distance_unit.dart';
+
+/// Distance in [unit] with two decimals, e.g. `5.32`.
+String formatDistance(double meters, DistanceUnit unit) =>
+    unit.fromMeters(meters).toStringAsFixed(2);
 
 String formatDuration(Duration d) {
   String two(int n) => n.toString().padLeft(2, '0');
@@ -16,15 +20,27 @@ String formatDurationShort(Duration d) {
   return h > 0 ? '${h}h ${m.toString().padLeft(2, '0')}m' : '${m}m ${s}s';
 }
 
-/// Minutes per kilometre, e.g. `5:32`.
-String formatPace(double speedMps) {
-  if (speedMps < 0.3) return '--:--';
-  final secondsPerKm = (1000 / speedMps).round();
-  final seconds = (secondsPerKm % 60).toString().padLeft(2, '0');
-  return '${secondsPerKm ~/ 60}:$seconds';
+/// Minutes per [unit], e.g. `5:32`; `--:--` when standing still.
+String formatPaceIn(double speedMps, DistanceUnit unit) {
+  final seconds = unit.secondsPerUnit(speedMps);
+  return seconds == null ? '--:--' : formatPaceSeconds(seconds);
 }
 
-String formatSpeedKmh(double speedMps) => (speedMps * 3.6).toStringAsFixed(1);
+/// `m:ss` from a pace in seconds, e.g. 315 → `5:15`.
+String formatPaceSeconds(num seconds) {
+  final total = seconds.round();
+  return '${total ~/ 60}:${(total % 60).toString().padLeft(2, '0')}';
+}
+
+/// Telemetry style `5'15"` from a pace in seconds.
+String formatPaceSecondsQuote(num seconds) {
+  final total = seconds.round();
+  return "${total ~/ 60}'${(total % 60).toString().padLeft(2, '0')}\"";
+}
+
+/// Speed in [unit] per hour with one decimal.
+String formatSpeedIn(double speedMps, DistanceUnit unit) =>
+    unit.perHour(speedMps).toStringAsFixed(1);
 
 const _thaiMonths = [
   'ม.ค.',
@@ -85,3 +101,31 @@ const _thaiMonthsFull = [
 /// e.g. `ตุลาคม 2569`
 String formatMonthYear(DateTime t) =>
     '${_thaiMonthsFull[t.month - 1]} ${t.year + 543}';
+
+const _thaiWeekdaysShort = ['จ.', 'อ.', 'พ.', 'พฤ.', 'ศ.', 'ส.', 'อา.'];
+const _thaiWeekdays = [
+  'จันทร์',
+  'อังคาร',
+  'พุธ',
+  'พฤหัสบดี',
+  'ศุกร์',
+  'เสาร์',
+  'อาทิตย์',
+];
+
+/// `จ.` … `อา.`
+String thaiWeekdayShort(DateTime t) => _thaiWeekdaysShort[t.weekday - 1];
+
+/// `จันทร์` … `อาทิตย์`
+String thaiWeekday(DateTime t) => _thaiWeekdays[t.weekday - 1];
+
+/// e.g. `16 พ.ค.`
+String formatDayMonth(DateTime t) => '${t.day} ${_thaiMonths[t.month - 1]}';
+
+/// e.g. `พฤหัสบดี 16 พ.ค. 2569`
+String formatLongDate(DateTime t) =>
+    '${thaiWeekday(t)} ${formatDayMonth(t)} ${t.year + 543}';
+
+/// e.g. `18:30`
+String formatClock(DateTime t) =>
+    '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';

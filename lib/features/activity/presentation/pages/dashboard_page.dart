@@ -15,7 +15,6 @@ import '../../../../core/widgets/progress_ring.dart';
 import '../../../../core/widgets/status_pill.dart';
 import '../../../auth/presentation/bloc/auth_cubit.dart';
 import '../../../auth/presentation/bloc/profile_cubit.dart';
-import '../../../auth/presentation/pages/account_page.dart';
 import '../../domain/entities/activity.dart';
 import '../../domain/entities/activity_insights.dart';
 import '../../domain/entities/monthly_challenge.dart';
@@ -23,6 +22,11 @@ import '../../domain/entities/route_shape.dart';
 import '../../domain/entities/weather_report.dart';
 import '../../domain/entities/weekly_stats.dart';
 import '../../domain/services/calories.dart';
+import '../../../../core/units/unit_labels.dart';
+import '../../../athlete/presentation/pages/profile_page.dart';
+import '../../../athlete/presentation/units.dart';
+import '../../../training/presentation/pages/schedule_page.dart';
+import '../../../training/presentation/widgets/training_teaser.dart';
 import '../activity_labels.dart';
 import '../activity_refresh.dart';
 import '../bloc/dashboard/dashboard_cubit.dart';
@@ -68,7 +72,7 @@ class DashboardPage extends StatelessWidget {
                         AvatarButton(
                           signedIn: signedIn,
                           onPressed: () =>
-                              Navigator.of(context).push(AccountPage.route()),
+                              Navigator.of(context).push(ProfilePage.route()),
                         ),
                       ],
                     ),
@@ -132,6 +136,29 @@ class DashboardPage extends StatelessWidget {
                         onStart: onStart,
                       ),
                     ),
+                    const SizedBox(height: 28),
+                    FadeSlideIn(
+                      delay: const Duration(milliseconds: 300),
+                      child: SectionHeader(
+                        'ตารางซ้อม',
+                        icon: Icons.event_note_outlined,
+                        action: TextButton.icon(
+                          onPressed: () =>
+                              Navigator.of(context).push(SchedulePage.route()),
+                          iconAlignment: IconAlignment.end,
+                          icon: const Icon(
+                            Icons.arrow_forward_rounded,
+                            size: 18,
+                          ),
+                          label: const Text('ดูตาราง'),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    const FadeSlideIn(
+                      delay: Duration(milliseconds: 320),
+                      child: TrainingTeaser(),
+                    ),
                     if (state.challenge != null) ...[
                       const SizedBox(height: 16),
                       FadeSlideIn(
@@ -161,7 +188,7 @@ class _Greeting extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final name = context.select(
-      (ProfileCubit c) => c.state.profile?.displayName,
+      (ProfileCubit c) => c.state.profile.displayName,
     );
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -223,7 +250,8 @@ class _RecordingBanner extends StatelessWidget {
                         ),
                         Text(
                           '${formatDuration(state.movingTime)} · '
-                          '${formatDistanceKm(state.distanceMeters)} กม.',
+                          '${context.units.distance(state.distanceMeters)} '
+                          '${context.units.distanceUnit}',
                           style: AppText.metricSm,
                         ),
                         const Icon(Icons.chevron_right_rounded),
@@ -249,6 +277,8 @@ class _WeekBento extends StatelessWidget {
     final progress = w?.progressToward(kWeeklyGoalMeters) ?? 0;
     final today = w?.todayDistanceMeters ?? 0;
     final time = w?.movingTime ?? Duration.zero;
+    final units = context.units;
+    final goal = units.distanceValue(kWeeklyGoalMeters);
     return Column(
       children: [
         IntrinsicHeight(
@@ -301,12 +331,13 @@ class _WeekBento extends StatelessWidget {
                               TextSpan(
                                 children: [
                                   TextSpan(
-                                    text: formatDistanceKm(distance),
+                                    text: units.distance(distance),
                                     style: AppText.metricSm,
                                   ),
                                   TextSpan(
                                     text:
-                                        ' จาก ${(kWeeklyGoalMeters / 1000).round()} กม.',
+                                        ' จาก ${goal == goal.roundToDouble() ? goal.round() : goal.toStringAsFixed(1)} '
+                                        '${units.distanceUnit}',
                                     style: AppText.label,
                                   ),
                                 ],
@@ -326,12 +357,12 @@ class _WeekBento extends StatelessWidget {
                     BentoStat(
                       label: 'ระยะทาง',
                       icon: Icons.route_rounded,
-                      value: formatDistanceKm(distance),
-                      numeric: distance / 1000,
+                      value: units.distance(distance),
+                      numeric: units.distanceValue(distance),
                       format: (v) => v.toStringAsFixed(2),
-                      unit: 'กม.',
+                      unit: units.distanceUnit,
                       footer: today > 0
-                          ? '+${formatDistanceKm(today)} วันนี้'
+                          ? '+${units.distance(today)} วันนี้'
                           : 'ยังไม่ได้ออกวันนี้',
                       footerIcon: today > 0 ? Icons.trending_up_rounded : null,
                       footerColor: today > 0 ? AppColors.lime : null,
@@ -423,7 +454,8 @@ class _WeatherCard extends StatelessWidget {
                   style: AppText.bodyLg.copyWith(fontWeight: FontWeight.w500),
                 ),
                 Text(
-                  'ลม ${weather.windKmh.round()} กม./ชม. · ${advice.hint}',
+                  'ลม ${context.units.windFromKmh(weather.windKmh)} · '
+                  '${advice.hint}',
                   style: AppText.caption.copyWith(
                     color: AppColors.textSecondary,
                   ),
@@ -515,8 +547,9 @@ class _LatestActivity extends StatelessWidget {
                     top: 12,
                     child: StatusPill(
                       text: a.type.usesPace
-                          ? 'PACE ${formatPaceQuote(speed)}'
-                          : '${formatSpeedKmh(speed)} KM/H',
+                          ? 'PACE ${context.units.paceQuote(speed)}'
+                          : '${context.units.speed(speed)} '
+                                '${context.units.unit.latinSpeed}',
                       mono: true,
                       color: AppColors.lime,
                     ),
@@ -569,10 +602,12 @@ class _LatestActivity extends StatelessWidget {
                         TextSpan(
                           children: [
                             TextSpan(
-                              text: formatDistanceKm(a.distanceMeters),
+                              text: context.units.distance(a.distanceMeters),
                               style: AppText.metricSm,
                             ),
-                            const TextSpan(text: ' กม.  •  '),
+                            TextSpan(
+                              text: ' ${context.units.distanceUnit}  •  ',
+                            ),
                             TextSpan(
                               text: formatDurationShort(a.movingTime),
                               style: AppText.metricSm,
@@ -596,8 +631,9 @@ class _LatestActivity extends StatelessWidget {
               _MiniStat(
                 label: a.type.usesPace ? 'เพซเฉลี่ย' : 'ความเร็วเฉลี่ย',
                 value: a.type.usesPace
-                    ? formatPaceQuote(speed)
-                    : '${formatSpeedKmh(speed)} กม./ชม.',
+                    ? context.units.paceQuote(speed)
+                    : '${context.units.speed(speed)} '
+                          '${context.units.speedUnit}',
               ),
               _MiniStat(label: 'แคลอรี่', value: '${kcal.round()} kcal'),
               _MiniStat(
@@ -708,7 +744,8 @@ class _ChallengeCard extends StatelessWidget {
                 Text(
                   done
                       ? 'สำเร็จแล้ว! ได้รับเหรียญ ${challenge.badge}'
-                      : 'สะสมอีก ${formatDistanceKm(left.toDouble())} กม. '
+                      : 'สะสมอีก ${context.units.distance(left.toDouble())} '
+                            '${context.units.distanceUnit} '
                             'เพื่อรับเหรียญ ${challenge.badge}',
                   style: AppText.caption.copyWith(
                     color: AppColors.textSecondary,

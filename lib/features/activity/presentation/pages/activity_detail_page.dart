@@ -29,7 +29,12 @@ import '../../domain/repositories/activity_photo_repository.dart';
 import '../../domain/repositories/activity_repository.dart';
 import '../../domain/services/calories.dart';
 import '../../domain/services/weather_service.dart';
+import '../../../../core/units/distance_unit.dart';
+import '../../../../core/units/unit_labels.dart';
+import '../../../athlete/presentation/bloc/gear_cubit.dart';
+import '../../../athlete/presentation/units.dart';
 import '../activity_labels.dart';
+import '../activity_refresh.dart';
 import '../bloc/detail/activity_detail_cubit.dart';
 import '../widgets/route_map.dart';
 
@@ -144,8 +149,9 @@ class _Body extends StatelessWidget {
   Widget build(BuildContext context) {
     final activity = state.activity!;
     final insights = state.insights!;
+    final units = context.units;
     final splits = activity.type.usesPace
-        ? activity.splits()
+        ? activity.splits(every: units.unit.meters)
         : const <ActivitySplit>[];
     var i = 0;
     Widget stagger(Widget child) => FadeSlideIn(
@@ -206,12 +212,19 @@ class _Body extends StatelessWidget {
         ),
         const SizedBox(height: 16),
         stagger(_EnergyCard(activity)),
+        if (activity.type != ActivityType.ride) ...[
+          const SizedBox(height: 12),
+          stagger(_ShoeRow(activity)),
+        ],
         if (splits.isNotEmpty) ...[
           const SizedBox(height: 28),
           stagger(
-            const SectionHeader(
+            SectionHeader(
               'สปลิต (Splits)',
-              action: Text('ระยะฐาน 1.0 กม.', style: AppText.monoLabel),
+              action: Text(
+                'ระยะฐาน 1.0 ${units.distanceUnit}',
+                style: AppText.monoLabel,
+              ),
             ),
           ),
           const SizedBox(height: 12),
@@ -339,7 +352,8 @@ class _MapCard extends StatelessWidget {
                 children: [
                   const Text('LUMINESCENT TRACK', style: AppText.monoLabelSm),
                   Text(
-                    '${formatDistanceKm(activity.distanceMeters)} km · '
+                    '${context.units.distance(activity.distanceMeters)} '
+                    '${context.units.unit.english} · '
                     '${activity.segments.length} segment'
                     '${activity.segments.length == 1 ? '' : 's'}',
                     style: AppText.metricSm.copyWith(color: AppColors.lime),
@@ -424,10 +438,10 @@ class _StatBento extends StatelessWidget {
               Expanded(
                 child: BentoStat(
                   label: 'ระยะทาง',
-                  value: formatDistanceKm(activity.distanceMeters),
-                  numeric: activity.distanceMeters / 1000,
+                  value: context.units.distance(activity.distanceMeters),
+                  numeric: context.units.distanceValue(activity.distanceMeters),
                   format: (v) => v.toStringAsFixed(2),
-                  unit: 'กม.',
+                  unit: context.units.distanceUnit,
                   valueStyle: AppText.metricMd,
                   footer: vs == null
                       ? 'ครั้งแรก'
@@ -449,9 +463,11 @@ class _StatBento extends StatelessWidget {
                 child: BentoStat(
                   label: activity.type.usesPace ? 'เพซเฉลี่ย' : 'ความเร็ว',
                   value: activity.type.usesPace
-                      ? formatPace(speed)
-                      : formatSpeedKmh(speed),
-                  unit: activity.type.usesPace ? '/กม.' : 'กม./ชม.',
+                      ? context.units.pace(speed)
+                      : context.units.speed(speed),
+                  unit: activity.type.usesPace
+                      ? context.units.paceUnit
+                      : context.units.speedUnit,
                   valueStyle: AppText.metricMd,
                   footer: switch (insights.effort) {
                     Effort.easy => 'สบายๆ',
@@ -585,14 +601,21 @@ class _SplitsCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final fastest = splits.map((s) => s.averageSpeedMps).reduce(math.max);
     final slowest = splits.map((s) => s.averageSpeedMps).reduce(math.min);
+    final units = context.units;
     return GlassCard(
       child: Column(
         children: [
-          const Row(
+          Row(
             children: [
-              SizedBox(width: 52, child: Text('กม.', style: AppText.caption)),
-              SizedBox(width: 72, child: Text('เพซ', style: AppText.caption)),
-              Expanded(
+              SizedBox(
+                width: 52,
+                child: Text(units.distanceUnit, style: AppText.caption),
+              ),
+              const SizedBox(
+                width: 72,
+                child: Text('เพซ', style: AppText.caption),
+              ),
+              const Expanded(
                 child: Text(
                   'เกณฑ์ความเร็วสัมพัทธ์',
                   textAlign: TextAlign.end,
@@ -610,8 +633,8 @@ class _SplitsCard extends StatelessWidget {
                   SizedBox(
                     width: 52,
                     child: Text(
-                      split.distanceMeters < 1000
-                          ? (split.distanceMeters / 1000).toStringAsFixed(2)
+                      split.distanceMeters < units.unit.meters
+                          ? units.distance(split.distanceMeters)
                           : '${split.index}',
                       style: AppText.metricSm,
                     ),
@@ -619,7 +642,7 @@ class _SplitsCard extends StatelessWidget {
                   SizedBox(
                     width: 72,
                     child: Text(
-                      formatPace(split.averageSpeedMps),
+                      units.pace(split.averageSpeedMps),
                       style: AppText.metricSm.copyWith(
                         color: split.averageSpeedMps == fastest
                             ? AppColors.lime
@@ -899,5 +922,111 @@ class _PhotoTile extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+/// The shoe this activity counts toward; tap to change it.
+class _ShoeRow extends StatelessWidget {
+  const _ShoeRow(this.activity);
+
+  final Activity activity;
+
+  @override
+  Widget build(BuildContext context) {
+    final shoes = context.select((GearCubit c) => c.state.shoes);
+    // A deleted or unknown shoe counts as none.
+    final current = shoes.where((s) => s.id == activity.shoeId).firstOrNull;
+    return GlassCard(
+      padding: const EdgeInsets.fromLTRB(14, 10, 10, 10),
+      onTap: () => _pick(context, current?.id),
+      child: Row(
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: const BoxDecoration(
+              color: AppColors.limeSoft,
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.directions_run_rounded,
+              color: AppColors.lime,
+              size: 20,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('รองเท้าที่ใช้', style: AppText.label),
+                Text(
+                  current?.name ??
+                      (shoes.isEmpty
+                          ? 'เพิ่มรองเท้าได้ที่หน้าข้อมูลผู้ใช้'
+                          : 'ไม่ได้ระบุ'),
+                  style: AppText.bodyLg,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+          if (shoes.isNotEmpty)
+            const Icon(
+              Icons.swap_horiz_rounded,
+              color: AppColors.textSecondary,
+            ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _pick(BuildContext context, String? currentId) async {
+    final shoes = context.read<GearCubit>().state.shoes;
+    if (shoes.isEmpty) return;
+    final cubit = context.read<ActivityDetailCubit>();
+    // Sentinel for "no shoe": the sheet returns null when dismissed.
+    const none = '';
+    final picked = await showModalBottomSheet<String>(
+      context: context,
+      useSafeArea: true,
+      builder: (context) => ListView(
+        shrinkWrap: true,
+        padding: const EdgeInsets.fromLTRB(12, 0, 12, 24),
+        children: [
+          const Padding(
+            padding: EdgeInsets.fromLTRB(8, 4, 8, 12),
+            child: Text('เลือกรองเท้า', style: AppText.headlineSm),
+          ),
+          for (final shoe in shoes)
+            if (!shoe.retired || shoe.id == currentId)
+              ListTile(
+                leading: Icon(
+                  shoe.id == currentId
+                      ? Icons.radio_button_checked_rounded
+                      : Icons.radio_button_off_rounded,
+                  color: AppColors.lime,
+                ),
+                title: Text(shoe.name),
+                subtitle: shoe.model == null ? null : Text(shoe.model!),
+                onTap: () => Navigator.of(context).pop(shoe.id),
+              ),
+          ListTile(
+            leading: Icon(
+              currentId == null
+                  ? Icons.radio_button_checked_rounded
+                  : Icons.radio_button_off_rounded,
+              color: AppColors.textSecondary,
+            ),
+            title: const Text('ไม่ระบุรองเท้า'),
+            onTap: () => Navigator.of(context).pop(none),
+          ),
+        ],
+      ),
+    );
+    if (picked == null || !context.mounted) return;
+    await cubit.setShoe(picked == none ? null : picked);
+    if (context.mounted) await context.refreshActivities();
   }
 }

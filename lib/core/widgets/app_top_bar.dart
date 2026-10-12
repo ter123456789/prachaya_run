@@ -139,8 +139,14 @@ class SectionHeader extends StatelessWidget {
           Icon(icon, color: AppColors.lime, size: 22),
           const SizedBox(width: 10),
         ],
-        Expanded(child: Text(title, style: AppText.headlineSm)),
-        ?action,
+        Expanded(
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(title, style: AppText.headlineSm, maxLines: 1),
+          ),
+        ),
+        if (action != null) ...[const SizedBox(width: 8), action!],
       ],
     );
   }

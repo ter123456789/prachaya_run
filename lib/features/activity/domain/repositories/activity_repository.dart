@@ -9,4 +9,8 @@ abstract interface class ActivityRepository {
   Future<Activity?> getById(String id);
 
   Future<void> delete(String id);
+
+  /// Links the activity to [shoeId] (null unlinks). An ordinary edit: it is
+  /// stamped with a new edit time and synced.
+  Future<void> setShoe(String id, String? shoeId);
 }

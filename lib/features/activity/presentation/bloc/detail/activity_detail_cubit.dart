@@ -32,12 +32,13 @@ final class ActivityDetailState extends Equatable {
 
   ActivityDetailState copyWith({
     ActivityDetailStatus? status,
+    Activity? activity,
     WeatherReport? weather,
     List<ActivityPhoto>? photos,
     bool? addingPhoto,
   }) => ActivityDetailState(
     status: status ?? this.status,
-    activity: activity,
+    activity: activity ?? this.activity,
     insights: insights,
     weather: weather ?? this.weather,
     photos: photos ?? this.photos,
@@ -125,6 +126,15 @@ class ActivityDetailCubit extends Cubit<ActivityDetailState> {
     if (photos == null) return;
     await photos.delete(photo);
     emit(state.copyWith(photos: await photos.photosOf(activityId)));
+  }
+
+  /// Links the activity to [shoeId] (null unlinks).
+  Future<void> setShoe(String? shoeId) async {
+    final activity = state.activity;
+    if (activity == null || activity.shoeId == shoeId) return;
+    await _repository.setShoe(activityId, shoeId);
+    if (isClosed) return;
+    emit(state.copyWith(activity: activity.withShoe(shoeId)));
   }
 
   Future<void> delete() async {

@@ -3,10 +3,13 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 
 import '../../../../core/formatters.dart';
+import '../../../../core/units/distance_unit.dart';
+import '../../../../core/units/unit_labels.dart';
 import '../../../activity/domain/entities/activity.dart';
 import '../../../activity/domain/entities/route_shape.dart';
 import '../../../activity/presentation/activity_labels.dart';
 import '../../../activity/presentation/widgets/route_painter.dart';
+import '../../../athlete/presentation/units.dart';
 import '../bloc/photo_overlay_cubit.dart';
 
 typedef _StatItem = ({IconData icon, String label, String value});
@@ -58,7 +61,8 @@ class ActivityOverlay extends StatelessWidget {
       builder: (context, constraints) {
         final u = constraints.maxWidth / 360;
         final stats = [
-          for (final s in this.stats) _item(activity, s, language),
+          for (final s in this.stats)
+            _item(activity, s, language, context.units.unit),
         ];
         final Widget brand = !showBrand
             ? const SizedBox.shrink()
@@ -224,25 +228,31 @@ class ActivityOverlay extends StatelessWidget {
     );
   }
 
-  static _StatItem _item(Activity a, OverlayStat stat, OverlayLanguage lang) {
+  static _StatItem _item(
+    Activity a,
+    OverlayStat stat,
+    OverlayLanguage lang,
+    DistanceUnit unit,
+  ) {
     final en = lang == OverlayLanguage.en;
     final speed = a.summary.averageSpeedMps;
-    final km = en ? 'km' : 'กม.';
+    final km = en ? unit.english : unit.short;
     return switch (stat) {
       OverlayStat.distance => (
         icon: Icons.route,
         label: en ? 'Distance' : 'ระยะทาง',
-        value: '${formatDistanceKm(a.distanceMeters)} $km',
+        value: '${formatDistance(a.distanceMeters, unit)} $km',
       ),
       OverlayStat.avgSpeed => (
         icon: Icons.speed,
         label: en ? 'Avg Speed' : 'ความเร็วเฉลี่ย',
-        value: '${formatSpeedKmh(speed)} ${en ? 'km/h' : 'กม./ชม.'}',
+        value:
+            '${formatSpeedIn(speed, unit)} ${en ? unit.englishSpeed : unit.speed}',
       ),
       OverlayStat.pace => (
         icon: Icons.av_timer,
         label: en ? 'Pace' : 'เพซ',
-        value: '${formatPace(speed)} /$km',
+        value: '${formatPaceIn(speed, unit)} /$km',
       ),
       OverlayStat.time => (
         icon: Icons.timer_outlined,

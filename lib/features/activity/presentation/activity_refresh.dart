@@ -1,20 +1,32 @@
 import 'package:flutter/widgets.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../athlete/presentation/bloc/gear_cubit.dart';
+import '../../training/presentation/bloc/training_cubit.dart';
 import 'bloc/dashboard/dashboard_cubit.dart';
 import 'bloc/history/history_cubit.dart';
 import 'bloc/sync/sync_cubit.dart';
 
 extension ActivityRefresh on BuildContext {
-  /// Reloads every screen that lists activities after a save or delete.
-  Future<void> refreshActivities() =>
-      Future.wait([read<HistoryCubit>().load(), read<DashboardCubit>().load()]);
+  /// Reloads every screen that lists activities (or derives from them, like
+  /// shoe mileage and finished workouts) after a save or delete.
+  Future<void> refreshActivities() => _reload(this);
 
   /// Pull-to-refresh: syncs with the server (if signed in), then reloads.
   Future<void> syncActivities() async {
-    final history = read<HistoryCubit>();
-    final dashboard = read<DashboardCubit>();
+    final reload = _reloaders(this);
     await read<SyncCubit>().sync();
-    await Future.wait([history.load(), dashboard.load()]);
+    await Future.wait(reload.map((r) => r()));
   }
 }
+
+Future<void> _reload(BuildContext context) =>
+    Future.wait(_reloaders(context).map((r) => r()));
+
+/// Read up front so nothing touches [context] after an await.
+List<Future<void> Function()> _reloaders(BuildContext context) => [
+  context.read<HistoryCubit>().load,
+  context.read<DashboardCubit>().load,
+  context.read<GearCubit>().load,
+  context.read<TrainingCubit>().load,
+];

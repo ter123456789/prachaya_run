@@ -1,21 +1,12 @@
 import '../entities/user_profile.dart';
+import '../services/profile_validation.dart';
 
 abstract interface class ProfileRepository {
-  /// The signed-in user's profile: cached copy first, refreshed from the
-  /// server when reachable. Null when signed out.
-  Future<UserProfile?> load();
+  /// The profile of whoever uses the app now: the signed-in account's, or
+  /// the device's own when signed out. Works offline.
+  Future<UserProfile> load();
 
-  /// Throws [ProfileUpdateException] when the server rejects or is
-  /// unreachable.
-  Future<UserProfile> update({
-    String? displayName,
-    double? weightKg,
-    bool clearWeight = false,
-  });
-}
-
-class ProfileUpdateException implements Exception {
-  const ProfileUpdateException({this.offline = false});
-
-  final bool offline;
+  /// Replaces the whole profile, saves it on the device and syncs it when
+  /// signed in. Throws [ProfileValidationException] for out-of-range values.
+  Future<UserProfile> save(UserProfile profile);
 }

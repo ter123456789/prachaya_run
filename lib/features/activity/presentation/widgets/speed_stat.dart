@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 
-import '../../../../core/formatters.dart';
 import '../../../../core/widgets/glass_stat_tile.dart';
 import '../../domain/entities/activity_type.dart';
+import '../../../athlete/presentation/units.dart';
 import '../activity_labels.dart';
 
 /// Pace for runs/hikes, speed for rides.
@@ -24,19 +24,20 @@ class SpeedStat extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final units = context.units;
     return type.usesPace
         ? GlassStatTile(
             label: 'เพซเฉลี่ย',
-            value: formatPace(speedMps),
-            unit: '/กม.',
+            value: units.pace(speedMps),
+            unit: units.paceUnit,
             icon: showIcon ? Icons.speed : null,
             blur: blur,
             centered: centered,
           )
         : GlassStatTile(
             label: 'ความเร็วเฉลี่ย',
-            value: formatSpeedKmh(speedMps),
-            unit: 'กม./ชม.',
+            value: units.speed(speedMps),
+            unit: units.speedUnit,
             icon: showIcon ? Icons.speed : null,
             blur: blur,
             centered: centered,

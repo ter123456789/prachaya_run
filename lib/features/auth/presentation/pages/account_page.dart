@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/formatters.dart';
@@ -14,10 +13,10 @@ import '../../../../core/widgets/glow_background.dart';
 import '../../../../core/widgets/pill_tabs.dart';
 import '../../../../core/widgets/status_pill.dart';
 import '../../../activity/domain/services/activity_sync.dart';
-import '../../../activity/domain/services/calories.dart';
 import '../../../activity/presentation/activity_refresh.dart';
 import '../../../activity/presentation/bloc/history/history_cubit.dart';
 import '../../../activity/presentation/bloc/sync/sync_cubit.dart';
+import '../../../athlete/presentation/units.dart';
 import '../../domain/services/credentials.dart';
 import '../bloc/auth_cubit.dart';
 import '../bloc/profile_cubit.dart';
@@ -319,10 +318,12 @@ class _SignInFormState extends State<_SignInForm> {
               child: BentoStat(
                 label: 'ระยะสะสมค้างซิงก์',
                 icon: Icons.schedule_rounded,
-                value: (localMeters / 1000).toStringAsFixed(1),
-                numeric: localMeters / 1000,
+                value: context.units
+                    .distanceValue(localMeters)
+                    .toStringAsFixed(1),
+                numeric: context.units.distanceValue(localMeters),
                 format: (v) => v.toStringAsFixed(1),
-                unit: 'กม.',
+                unit: context.units.distanceUnit,
                 footer: 'บันทึกออฟไลน์ปลอดภัย',
                 footerColor: AppColors.lime,
               ),
@@ -408,56 +409,8 @@ class _SignedIn extends StatefulWidget {
 }
 
 class _SignedInState extends State<_SignedIn> {
-  final _name = TextEditingController();
-  final _weight = TextEditingController();
-  bool _filled = false;
-
   /// Kept so the card can still render while it fades out after sign-out.
   String _email = '';
-
-  @override
-  void dispose() {
-    _name.dispose();
-    _weight.dispose();
-    super.dispose();
-  }
-
-  void _fill(ProfileState state) {
-    final p = state.profile;
-    if (p == null || _filled) return;
-    _filled = true;
-    _name.text = p.displayName ?? '';
-    final w = p.weightKg;
-    _weight.text = w == null ? '' : w.toStringAsFixed(w % 1 == 0 ? 0 : 1);
-  }
-
-  Future<void> _confirmLogout(BuildContext context) async {
-    final cubit = context.read<AuthCubit>();
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        icon: const Icon(Icons.logout_rounded, color: AppColors.negative),
-        title: const Text('ออกจากระบบ?'),
-        content: const Text(
-          'กิจกรรมของบัญชีนี้จะถูกซ่อนไว้ในเครื่อง และกลับมาแสดง'
-          'เมื่อเข้าสู่ระบบอีกครั้ง ส่วนที่ยังไม่ได้ซิงก์ก็ยังเก็บไว้',
-          style: AppText.body,
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('ยกเลิก'),
-          ),
-          TextButton(
-            style: TextButton.styleFrom(foregroundColor: AppColors.negative),
-            onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('ออกจากระบบ'),
-          ),
-        ],
-      ),
-    );
-    if (confirmed ?? false) await cubit.logout();
-  }
 
   Future<void> _confirmDelete(BuildContext context) async {
     final cubit = context.read<AuthCubit>();
@@ -510,214 +463,129 @@ class _SignedInState extends State<_SignedIn> {
     }
   }
 
-  void _save() {
-    FocusScope.of(context).unfocus();
-    final weight = double.tryParse(_weight.text.trim().replaceAll(',', '.'));
-    final name = _name.text.trim();
-    context.read<ProfileCubit>().save(
-      displayName: name.isEmpty ? null : name,
-      weightKg: weight,
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthCubit>().state;
     final sync = context.watch<SyncCubit>().state;
-    return BlocConsumer<ProfileCubit, ProfileState>(
-      listenWhen: (_, curr) => curr.result != null,
-      listener: (context, state) {
-        HapticFeedback.selectionClick();
-        ScaffoldMessenger.of(context)
-          ..hideCurrentSnackBar()
-          ..showSnackBar(
-            SnackBar(
-              content: Text(switch (state.result!) {
-                ProfileSaveResult.saved => 'บันทึกโปรไฟล์แล้ว',
-                ProfileSaveResult.offline =>
-                  'ออฟไลน์อยู่ ลองบันทึกอีกครั้งเมื่อต่อเน็ตได้',
-                ProfileSaveResult.failed =>
-                  'บันทึกไม่สำเร็จ ตรวจสอบชื่อ (1–40 ตัว) และน้ำหนัก (20–300 กก.)',
-              }),
-            ),
-          );
-      },
-      builder: (context, profile) {
-        _fill(profile);
-        final email = _email = auth.user?.email ?? _email;
-        final name = profile.profile?.displayName;
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            FadeSlideIn(
-              child: GlassCard(
-                radius: 28,
-                strong: true,
-                padding: const EdgeInsets.all(18),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 56,
-                      height: 56,
-                      decoration: const BoxDecoration(
-                        shape: BoxShape.circle,
-                        gradient: LinearGradient(
-                          colors: [AppColors.mintIce, AppColors.mint],
-                        ),
-                      ),
-                      alignment: Alignment.center,
-                      child: Text(
-                        (name ?? email).isEmpty
-                            ? '·'
-                            : (name ?? email).characters.first.toUpperCase(),
-                        style: AppText.headlineMd.copyWith(
-                          color: AppColors.onLime,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            name ?? 'นักวิ่ง Prachaya',
-                            style: AppText.headlineSm,
-                          ),
-                          Text(
-                            email,
-                            style: AppText.monoLabel,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-            FadeSlideIn(
-              delay: const Duration(milliseconds: 80),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: BentoStat(
-                      label: 'ค้างซิงก์',
-                      icon: Icons.cloud_upload_outlined,
-                      value: '${sync.pending}',
-                      unit: 'รายการ',
-                      footer: sync.pending == 0
-                          ? 'ข้อมูลตรงกับคลาวด์'
-                          : 'จะส่งขึ้นเมื่อออนไลน์',
-                      footerColor: sync.pending == 0
-                          ? AppColors.secondary
-                          : AppColors.lime,
+    final name = context.select(
+      (ProfileCubit c) => c.state.profile.displayName,
+    );
+    final email = _email = auth.user?.email ?? _email;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        FadeSlideIn(
+          child: GlassCard(
+            radius: 28,
+            strong: true,
+            padding: const EdgeInsets.all(18),
+            child: Row(
+              children: [
+                Container(
+                  width: 56,
+                  height: 56,
+                  decoration: const BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: LinearGradient(
+                      colors: [AppColors.mintIce, AppColors.mint],
                     ),
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: BentoStat(
-                      label: 'ซิงก์ล่าสุด',
-                      icon: Icons.history_rounded,
-                      value: sync.lastSyncedAt == null
-                          ? '—'
-                          : formatRelative(sync.lastSyncedAt!, DateTime.now()),
-                      valueStyle: AppText.metricMd,
-                      footer: switch (sync.lastOutcome) {
-                        SyncOutcome.offline => 'ออฟไลน์',
-                        SyncOutcome.failed => 'ล้มเหลว ลองใหม่',
-                        _ => 'อัตโนมัติทุกครั้งที่บันทึก',
-                      },
-                      footerColor:
-                          sync.lastOutcome == SyncOutcome.offline ||
-                              sync.lastOutcome == SyncOutcome.failed
-                          ? AppColors.negative
-                          : null,
-                    ),
+                  alignment: Alignment.center,
+                  child: Text(
+                    (name ?? email).isEmpty
+                        ? '·'
+                        : (name ?? email).characters.first.toUpperCase(),
+                    style: AppText.headlineMd.copyWith(color: AppColors.onLime),
                   ),
-                ],
-              ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        name ?? 'นักวิ่ง Prachaya',
+                        style: AppText.headlineSm,
+                      ),
+                      Text(
+                        email,
+                        style: AppText.monoLabel,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: 16),
-            FadeSlideIn(
-              delay: const Duration(milliseconds: 140),
-              child: GlassCard(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    const Text('โปรไฟล์', style: AppText.headlineSm),
-                    const SizedBox(height: 12),
-                    const Text('ชื่อที่แสดง', style: AppText.label),
-                    const SizedBox(height: 6),
-                    TextField(
-                      controller: _name,
-                      maxLength: 40,
-                      decoration: const InputDecoration(
-                        hintText: 'เช่น ปราชญา',
-                        counterText: '',
-                        prefixIcon: Icon(Icons.badge_outlined),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    const Text(
-                      'น้ำหนัก (ใช้คำนวณแคลอรี่)',
-                      style: AppText.label,
-                    ),
-                    const SizedBox(height: 6),
-                    TextField(
-                      controller: _weight,
-                      keyboardType: const TextInputType.numberWithOptions(
-                        decimal: true,
-                      ),
-                      decoration: InputDecoration(
-                        hintText: 'ค่าเริ่มต้น ${kDefaultWeightKg.round()}',
-                        prefixIcon: const Icon(Icons.monitor_weight_outlined),
-                        suffixText: 'กก.',
-                      ),
-                    ),
-                    const SizedBox(height: 14),
-                    OutlinedButton.icon(
-                      onPressed: profile.saving ? null : _save,
-                      icon: profile.saving
-                          ? const SizedBox.square(
-                              dimension: 18,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Icon(Icons.check_rounded),
-                      label: const Text('บันทึกโปรไฟล์'),
-                    ),
-                  ],
+          ),
+        ),
+        const SizedBox(height: 16),
+        FadeSlideIn(
+          delay: const Duration(milliseconds: 80),
+          child: Row(
+            children: [
+              Expanded(
+                child: BentoStat(
+                  label: 'ค้างซิงก์',
+                  icon: Icons.cloud_upload_outlined,
+                  value: '${sync.pending}',
+                  unit: 'รายการ',
+                  footer: sync.pending == 0
+                      ? 'ข้อมูลตรงกับคลาวด์'
+                      : 'จะส่งขึ้นเมื่อออนไลน์',
+                  footerColor: sync.pending == 0
+                      ? AppColors.secondary
+                      : AppColors.lime,
                 ),
               ),
-            ),
-            const SizedBox(height: 20),
-            FilledButton.icon(
-              onPressed: sync.syncing ? null : context.syncActivities,
-              icon: AnimatedRotation(
-                turns: sync.syncing ? 1 : 0,
-                duration: const Duration(milliseconds: 800),
-                child: const Icon(Icons.sync_rounded),
+              const SizedBox(width: 12),
+              Expanded(
+                child: BentoStat(
+                  label: 'ซิงก์ล่าสุด',
+                  icon: Icons.history_rounded,
+                  value: sync.lastSyncedAt == null
+                      ? '—'
+                      : formatRelative(sync.lastSyncedAt!, DateTime.now()),
+                  valueStyle: AppText.metricMd,
+                  footer: switch (sync.lastOutcome) {
+                    SyncOutcome.offline => 'ออฟไลน์',
+                    SyncOutcome.failed => 'ล้มเหลว ลองใหม่',
+                    _ => 'อัตโนมัติทุกครั้งที่บันทึก',
+                  },
+                  footerColor:
+                      sync.lastOutcome == SyncOutcome.offline ||
+                          sync.lastOutcome == SyncOutcome.failed
+                      ? AppColors.negative
+                      : null,
+                ),
               ),
-              label: Text(sync.syncing ? 'กำลังซิงก์…' : 'ซิงก์ตอนนี้'),
-            ),
-            const SizedBox(height: 12),
-            OutlinedButton.icon(
-              onPressed: auth.busy ? null : () => _confirmLogout(context),
-              icon: const Icon(Icons.logout_rounded, color: AppColors.negative),
-              label: const Text('ออกจากระบบ'),
-            ),
-            const SizedBox(height: 4),
-            TextButton.icon(
-              style: TextButton.styleFrom(foregroundColor: AppColors.negative),
-              onPressed: auth.busy ? null : () => _confirmDelete(context),
-              icon: const Icon(Icons.person_remove_outlined),
-              label: const Text('ลบบัญชี'),
-            ),
-          ],
-        );
-      },
+            ],
+          ),
+        ),
+        const SizedBox(height: 20),
+        FilledButton.icon(
+          onPressed: sync.syncing ? null : context.syncActivities,
+          icon: AnimatedRotation(
+            turns: sync.syncing ? 1 : 0,
+            duration: const Duration(milliseconds: 800),
+            child: const Icon(Icons.sync_rounded),
+          ),
+          label: Text(sync.syncing ? 'กำลังซิงก์…' : 'ซิงก์ตอนนี้'),
+        ),
+        const SizedBox(height: 12),
+        OutlinedButton.icon(
+          onPressed: auth.busy ? null : () => confirmLogout(context),
+          icon: const Icon(Icons.logout_rounded, color: AppColors.negative),
+          label: const Text('ออกจากระบบ'),
+        ),
+        const SizedBox(height: 4),
+        TextButton.icon(
+          style: TextButton.styleFrom(foregroundColor: AppColors.negative),
+          onPressed: auth.busy ? null : () => _confirmDelete(context),
+          icon: const Icon(Icons.person_remove_outlined),
+          label: const Text('ลบบัญชี'),
+        ),
+      ],
     );
   }
 }
@@ -772,4 +640,33 @@ class _StatusBar extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Asks before signing out, then signs out.
+Future<void> confirmLogout(BuildContext context) async {
+  final cubit = context.read<AuthCubit>();
+  final confirmed = await showDialog<bool>(
+    context: context,
+    builder: (context) => AlertDialog(
+      icon: const Icon(Icons.logout_rounded, color: AppColors.negative),
+      title: const Text('ออกจากระบบ?'),
+      content: const Text(
+        'กิจกรรมของบัญชีนี้จะถูกซ่อนไว้ในเครื่อง และกลับมาแสดง'
+        'เมื่อเข้าสู่ระบบอีกครั้ง ส่วนที่ยังไม่ได้ซิงก์ก็ยังเก็บไว้',
+        style: AppText.body,
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(false),
+          child: const Text('ยกเลิก'),
+        ),
+        TextButton(
+          style: TextButton.styleFrom(foregroundColor: AppColors.negative),
+          onPressed: () => Navigator.of(context).pop(true),
+          child: const Text('ออกจากระบบ'),
+        ),
+      ],
+    ),
+  );
+  if (confirmed ?? false) await cubit.logout();
 }

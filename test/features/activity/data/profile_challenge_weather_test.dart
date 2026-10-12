@@ -10,9 +10,6 @@ import 'package:prachaya_run/features/activity/data/datasources/app_database.dar
 import 'package:prachaya_run/features/activity/data/repositories/http_challenge_repository.dart';
 import 'package:prachaya_run/features/activity/data/services/open_meteo_weather_service.dart';
 import 'package:prachaya_run/features/activity/domain/entities/weather_report.dart';
-import 'package:prachaya_run/features/auth/data/repositories/http_profile_repository.dart';
-import 'package:prachaya_run/features/auth/domain/entities/user_profile.dart';
-import 'package:prachaya_run/features/auth/domain/repositories/profile_repository.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 import '../../../helpers/fake_server.dart';
@@ -46,42 +43,6 @@ void main() {
       tokens: tokens,
       httpClient: server.client,
     );
-  });
-
-  group('profile', () {
-    test('loads, updates and works from cache offline', () async {
-      final repo = HttpProfileRepository(api, tokens, kv);
-      expect(await repo.load(), const UserProfile());
-
-      final updated = await repo.update(weightKg: 72.5, displayName: 'ปราชญา');
-      expect(updated.weightKg, 72.5);
-      expect(server.profile['displayName'], 'ปราชญา');
-
-      server.offline = true;
-      expect((await repo.load())!.weightKg, 72.5);
-      expect(
-        () => repo.update(weightKg: 70),
-        throwsA(
-          isA<ProfileUpdateException>().having(
-            (e) => e.offline,
-            'offline',
-            true,
-          ),
-        ),
-      );
-    });
-
-    test('clearing the weight sends null', () async {
-      final repo = HttpProfileRepository(api, tokens, kv);
-      await repo.update(weightKg: 60);
-      await repo.update(clearWeight: true);
-      expect(server.profile['weightKg'], isNull);
-    });
-
-    test('signed out: no profile', () async {
-      tokens.session = null;
-      expect(await HttpProfileRepository(api, tokens, kv).load(), isNull);
-    });
   });
 
   group('challenge', () {

@@ -9,7 +9,9 @@ abstract final class AppDatabase {
   static const syncStateTable = 'sync_state';
   static const photosTable = 'activity_photos';
   static const kvTable = 'kv';
-  static const version = 3;
+  static const shoesTable = 'shoes';
+  static const workoutsTable = 'planned_workouts';
+  static const version = 4;
 
   /// [factory] and [path] let tests use an in-memory FFI database.
   static Future<Database> open({DatabaseFactory? factory, String? path}) async {
@@ -23,10 +25,12 @@ abstract final class AppDatabase {
           await _createV1(db);
           await _upgradeToV2(db);
           await _upgradeToV3(db);
+          await _upgradeToV4(db);
         },
         onUpgrade: (db, oldVersion, newVersion) async {
           if (oldVersion < 2) await _upgradeToV2(db);
           if (oldVersion < 3) await _upgradeToV3(db);
+          if (oldVersion < 4) await _upgradeToV4(db);
         },
       ),
     );
@@ -150,5 +154,28 @@ abstract final class AppDatabase {
         key TEXT PRIMARY KEY,
         value TEXT NOT NULL
       )''');
+  }
+
+  /// v4 (athlete profile + training):
+  /// - `activities.shoe_id`: the shoe an activity counts toward.
+  /// - `shoes`, `planned_workouts`: synced like activities (`owner_id`,
+  ///   `updated_at` last-write-wins, `deleted_at` tombstones, `synced`).
+  ///   `data` holds the API JSON without the bookkeeping fields.
+  /// The profile itself lives in `kv` (`profile:<account>` /
+  /// `profile:local`).
+  static Future<void> _upgradeToV4(Database db) async {
+    await db.execute('ALTER TABLE $activitiesTable ADD COLUMN shoe_id TEXT');
+    for (final table in [shoesTable, workoutsTable]) {
+      await db.execute('''
+        CREATE TABLE $table (
+          id TEXT PRIMARY KEY,
+          owner_id TEXT,
+          data TEXT NOT NULL,
+          updated_at INTEGER NOT NULL,
+          deleted_at INTEGER,
+          synced INTEGER NOT NULL DEFAULT 0
+        )''');
+      await db.execute('CREATE INDEX idx_${table}_owner ON $table(owner_id)');
+    }
   }
 }
