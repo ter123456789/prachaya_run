@@ -31,6 +31,10 @@ void main() {
   final binding = IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
   final email = 'e2e+${DateTime.now().millisecondsSinceEpoch}@prachaya.run';
+
+  /// `--dart-define=E2E_SKIP_PHOTO=true` skips only the photo checks, for a
+  /// server whose file storage is down; every other step still runs.
+  const skipPhoto = bool.fromEnvironment('E2E_SKIP_PHOTO');
   const password = 'password123';
 
   Future<void> wait(WidgetTester tester, [int ms = 600]) async {
@@ -327,22 +331,27 @@ void main() {
     final dashboard = home.read<DashboardCubit>();
     await dashboard.load();
     final recorded = dashboard.state.latest!;
-    await home.read<ActivityPhotoRepository>().add(
-      recorded.id,
-      await pngBytes(),
-      takenAt: DateTime.now(),
-    );
-    await sync.sync();
-    final photos = await api(
-      'GET',
-      '/activities/${recorded.id}/photos',
-      token: token,
-    );
-    final items = (photos['items']! as List).cast<Map<String, Object?>>();
-    expect(items, hasLength(1));
-    final file = await http.get(Uri.parse(items.single['url']! as String));
-    expect(file.statusCode, 200);
-    expect(file.bodyBytes.take(4), [0x89, 0x50, 0x4E, 0x47]);
+    if (skipPhoto) {
+      debugPrint('e2e: photo checks skipped (E2E_SKIP_PHOTO)');
+      await sync.sync();
+    } else {
+      await home.read<ActivityPhotoRepository>().add(
+        recorded.id,
+        await pngBytes(),
+        takenAt: DateTime.now(),
+      );
+      await sync.sync();
+      final photos = await api(
+        'GET',
+        '/activities/${recorded.id}/photos',
+        token: token,
+      );
+      final items = (photos['items']! as List).cast<Map<String, Object?>>();
+      expect(items, hasLength(1));
+      final file = await http.get(Uri.parse(items.single['url']! as String));
+      expect(file.statusCode, 200);
+      expect(file.bodyBytes.take(4), [0x89, 0x50, 0x4E, 0x47]);
+    }
 
     feed = await api(
       'GET',
@@ -351,7 +360,7 @@ void main() {
     );
     final serverItems = (feed['items']! as List).cast<Map<String, Object?>>();
     final serverRun = serverItems.firstWhere((a) => a['id'] == recorded.id);
-    expect(serverRun['photoCount'], 1);
+    expect(serverRun['photoCount'], skipPhoto ? 0 : 1);
     // Server totals match the app's (same formulas both sides).
     expect(
       (serverRun['distanceM']! as num).toDouble(),

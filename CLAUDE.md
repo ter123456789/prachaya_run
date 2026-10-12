@@ -129,3 +129,5 @@ Rules (enforced for every feature by `test/architecture_test.dart`):
   sync tests run on `sqflite_common_ffi` against an in-memory fake of the API (`test/helpers/fake_server.dart`)
 - End to end on a simulator against the real backend (screenshots → `build/e2e_screenshots/`):
   `flutter drive --driver=test_driver/integration_test.dart --target=integration_test/app_e2e_test.dart -d <id>`
+  (add `--dart-define=API_BASE_URL=...` for another server; `--dart-define=E2E_SKIP_PHOTO=true` skips
+  only the photo checks when the server's file storage is down; the test account is always deleted)
