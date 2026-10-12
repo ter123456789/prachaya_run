@@ -11,6 +11,7 @@ import 'package:prachaya_run/features/activity/data/datasources/activity_remote_
 import 'package:prachaya_run/features/activity/data/datasources/app_database.dart';
 import 'package:prachaya_run/features/activity/data/datasources/photo_local_data_source.dart';
 import 'package:prachaya_run/features/activity/data/repositories/offline_first_activity_repository.dart';
+import 'package:prachaya_run/features/activity/data/repositories/offline_first_photo_repository.dart';
 import 'package:prachaya_run/features/activity/data/sync/activity_sync_engine.dart';
 import 'package:prachaya_run/features/activity/domain/entities/activity.dart';
 import 'package:prachaya_run/features/activity/domain/services/activity_sync.dart';
@@ -52,6 +53,7 @@ void main() {
   late LocalFirstProfileRepository profile;
   late OfflineFirstActivityRepository activities;
   late SyncedRecordStore shoeStore;
+  late PhotoLocalDataSource photoStore;
   late DateTime now;
 
   setUp(() async {
@@ -77,7 +79,7 @@ void main() {
     engine = ActivitySyncEngine(
       local: local,
       remote: ActivityRemoteDataSource(api),
-      photos: PhotoLocalDataSource(db, photoDir),
+      photos: photoStore = PhotoLocalDataSource(db, photoDir),
       tokens: tokens,
       participants: [
         ProfileSync(profiles, api, clock: () => now),
@@ -109,9 +111,23 @@ void main() {
       local,
       engine,
       tokens,
+      photos: photoStore,
       clock: () => now,
     );
   });
+
+  Activity sampleRun() {
+    final a = sampleActivity();
+    return Activity(
+      id: _activityId,
+      type: a.type,
+      title: a.title,
+      startedAt: a.startedAt,
+      endedAt: a.endedAt,
+      movingTime: a.movingTime,
+      segments: a.segments,
+    );
+  }
 
   void tick([Duration by = const Duration(minutes: 1)]) => now = now.add(by);
 
@@ -265,6 +281,32 @@ void main() {
         server.live('shoes').where((s) => s['primary'] == true).single['id'],
         _shoeId,
       );
+    });
+
+    test('photo storage down does not hold back shoes and plans', () async {
+      final photoRepo = OfflineFirstPhotoRepository(photoStore, engine, tokens);
+      await activities.save(sampleRun());
+      await photoRepo.add(_activityId, const [
+        0xFF,
+        0xD8,
+        0xFF,
+        0xE0,
+        1,
+        2,
+        3,
+        4,
+      ], takenAt: now);
+      await shoes.save(const Shoe(id: _shoeId, name: 'Pegasus'));
+      await workouts.save(workout());
+      server.storageDown = true;
+      expect(await engine.sync(), SyncOutcome.failed);
+      expect(server.live('shoes'), hasLength(1));
+      expect(server.live('workouts'), hasLength(1));
+      expect(server.photos, isEmpty);
+
+      server.storageDown = false;
+      expect(await engine.sync(), SyncOutcome.synced);
+      expect(server.photos, hasLength(1));
     });
 
     test('invalid records are rejected before they are stored', () async {

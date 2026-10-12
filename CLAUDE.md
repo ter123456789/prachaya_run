@@ -70,6 +70,8 @@ Rules (enforced for every feature by `test/architecture_test.dart`):
   data JSON, updated_at, deleted_at, synced — same scoping, LWW and tombstones as activities).
   The profile is in `kv` (`profile:<userId>`, `profile:local` while signed out, `_dirty` flag).
 - Sync order: claimUnowned → push → pull → photos → participants (ProfileSync, /shoes, /workouts).
+  503 `storage_unavailable` (server photo storage down) keeps photos queued, still syncs the
+  participants, and reports the run as `failed` so it is retried.
   ProfileSync PATCHes every field when dirty (so clearing reaches the server), else GETs `/me`;
   a signed-out profile fills the account's empty fields on first sign-in. Multiple primary shoes
   (two offline devices) resolve to the most recently edited one; unknown shoeIds count as none.

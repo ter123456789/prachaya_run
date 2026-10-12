@@ -324,6 +324,24 @@ void main() {
       expect(await photoRepo.photosOf(_id), [photo]);
     });
 
+    test(
+      'storage down (503): the photo stays queued and goes up later',
+      () async {
+        await repository.save(_activity());
+        server.storageDown = true;
+        final photo = await photoRepo.add(_id, jpeg, takenAt: now);
+        // The activity syncs; the outcome reports the photo still waiting.
+        expect(await engine.sync(), SyncOutcome.failed);
+        expect(server.activities, contains(_id));
+        expect(server.photos, isEmpty);
+        expect(await photoRepo.photosOf(_id), [photo]);
+
+        server.storageDown = false;
+        expect(await engine.sync(), SyncOutcome.synced);
+        expect(server.photos.keys, [photo.id]);
+      },
+    );
+
     test('photos added on another device are downloaded; deletes flow both '
         'ways', () async {
       await repository.save(_activity());

@@ -9,6 +9,7 @@ import '../../domain/services/activity_sync.dart';
 import '../datasources/activity_local_data_source.dart';
 import '../datasources/activity_remote_data_source.dart';
 import '../datasources/photo_local_data_source.dart';
+import '../models/remote_activity_summary.dart';
 
 /// Pushes local changes, then pulls the server's change feed
 /// (docs/api.md, "Pull sync"). One run at a time; a request made during a
@@ -110,11 +111,12 @@ class ActivitySyncEngine implements ActivitySync {
       }
       await _push(session.userId, mark);
       await _pull(session.userId, mark);
-      await _syncPhotos(session.userId, mark);
+      final photosSynced = await _syncPhotos(session.userId, mark);
       for (final p in _participants) {
         mark(await p.sync(session.userId));
       }
-      return SyncOutcome.synced;
+      // Photo storage down: everything else is synced, photos stay queued.
+      return photosSynced ? SyncOutcome.synced : SyncOutcome.failed;
     } on NetworkException {
       return SyncOutcome.offline;
     } on ApiException catch (e) {
@@ -159,8 +161,10 @@ class ActivitySyncEngine implements ActivitySync {
   }
 
   /// After activities: photo deletes, uploads, then lists of activities
-  /// whose photos changed elsewhere.
-  Future<void> _syncPhotos(
+  /// whose photos changed elsewhere. Returns false when the server's photo
+  /// storage is down (503 `storage_unavailable`): queued photos stay queued
+  /// and the rest of the sync carries on.
+  Future<bool> _syncPhotos(
     String userId,
     void Function(bool changed) mark,
   ) async {
@@ -181,6 +185,7 @@ class ActivitySyncEngine implements ActivitySync {
         );
         await _photos.markUploaded(p.id);
       } on ApiException catch (e) {
+        if (_storageDown(e)) return false;
         // Activity gone or file rejected: drop it rather than retry forever.
         if (e.status == 404 || e.status == 413 || e.status == 415) {
           await _photos.purge(p.id);
@@ -193,7 +198,13 @@ class ActivitySyncEngine implements ActivitySync {
       }
     }
     for (final activityId in await _photos.staleActivities(userId)) {
-      final remote = await _remote.photos(activityId);
+      final List<RemotePhoto>? remote;
+      try {
+        remote = await _remote.photos(activityId);
+      } on ApiException catch (e) {
+        if (_storageDown(e)) return false;
+        rethrow;
+      }
       if (remote == null) continue;
       mark(
         await _photos.reconcile(
@@ -204,5 +215,9 @@ class ActivitySyncEngine implements ActivitySync {
         ),
       );
     }
+    return true;
   }
+
+  static bool _storageDown(ApiException e) =>
+      e.status == 503 && e.code == 'storage_unavailable';
 }

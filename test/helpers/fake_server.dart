@@ -34,6 +34,10 @@ class FakeServer {
   String validAccessToken = 'access-1';
   String validRefreshToken = 'refresh-1';
   bool offline = false;
+
+  /// Photo storage (S3) down: photo upload and list answer 503
+  /// `storage_unavailable`, as in docs/api.md.
+  bool storageDown = false;
   bool accountDeleted = false;
   int _clock = 0;
 
@@ -160,6 +164,7 @@ class FakeServer {
       if (activity == null || activity['deletedAt'] != null) {
         return _error(404, 'not_found');
       }
+      if (storageDown) return _error(503, 'storage_unavailable');
       if (request.method == 'PUT') {
         expect(
           request.headers['content-type'],
