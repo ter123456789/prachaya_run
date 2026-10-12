@@ -94,6 +94,23 @@ void main() {
   testWidgets('profile, shoe, plan, sign up, record, sync across devices', (
     tester,
   ) async {
+    // Never leave a test account behind (e.g. on production), even when a
+    // step fails: log in again and delete it. A 401 means it is gone.
+    addTearDown(() async {
+      final login = await http.post(
+        Uri.parse('$apiBaseUrl/auth/login'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'email': email, 'password': password}),
+      );
+      if (login.statusCode != 200) return;
+      final token =
+          (jsonDecode(login.body) as Map<String, Object?>)['accessToken'];
+      final deleted = await http.delete(
+        Uri.parse('$apiBaseUrl/me'),
+        headers: {'Authorization': 'Bearer $token'},
+      );
+      debugPrint('e2e cleanup: DELETE /me → ${deleted.statusCode}');
+    });
     await app.main();
     await waitFor(tester, find.text('พร้อมออกไปวิ่งหรือยัง?'));
     final home = tester.element(find.byType(HomePage));
