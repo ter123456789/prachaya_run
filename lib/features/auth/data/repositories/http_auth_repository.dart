@@ -44,15 +44,42 @@ class HttpAuthRepository implements AuthRepository {
     required String password,
   }) => _signIn('/auth/register', email, password);
 
+  /// Providers this device supports that the server has client ids for.
+  /// The server is asked with a junk token (api.md v1.3, "Availability"):
+  /// 401 means set up, 503 `provider_not_configured` means not. Offline,
+  /// none are offered (signing in needs the server anyway).
   @override
   Future<Set<SocialProvider>> availableProviders() async {
     final social = _social;
     if (social == null) return const {};
-    return {
-      for (final p in SocialProvider.values)
-        if (await social.isAvailable(p)) p,
-    };
+    final result = <SocialProvider>{};
+    for (final p in SocialProvider.values) {
+      if (!await social.isAvailable(p)) continue;
+      try {
+        await _api.post(_path(p), _body(p, 'probe'), auth: false);
+        result.add(p);
+      } on ApiException catch (e) {
+        if (e.code != 'provider_not_configured') result.add(p);
+      } on NetworkException {
+        // Not offered while offline.
+      }
+    }
+    return result;
   }
+
+  static String _path(SocialProvider p) => switch (p) {
+    SocialProvider.apple => '/auth/apple',
+    SocialProvider.google => '/auth/google',
+  };
+
+  static Map<String, Object?> _body(
+    SocialProvider p,
+    String token, {
+    String? fullName,
+  }) => switch (p) {
+    SocialProvider.apple => {'identityToken': token, 'fullName': ?fullName},
+    SocialProvider.google => {'idToken': token},
+  };
 
   @override
   Future<AuthUser> signInWith(SocialProvider provider) async {

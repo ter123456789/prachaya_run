@@ -82,9 +82,10 @@ Rules (enforced for every feature by `test/architecture_test.dart`):
   send them; signing out restores them. **Cancel** signs out. The summary shows count, distance,
   time and PB 5K/10K (`best_efforts.dart`, from the tracks).
 - Sign in with Apple / Google (api.md v1.3): `POST /auth/apple` / `/auth/google` with the provider's ID token.
-  The buttons show only in builds with `--dart-define=SOCIAL_SIGN_IN=true`, plus `GOOGLE_CLIENT_ID` /
-  `GOOGLE_SERVER_CLIENT_ID` for Google. They stay off until the Apple Developer team and Google client
-  ids exist and Railway has `APPLE_CLIENT_IDS` / `GOOGLE_CLIENT_IDS`.
+  A button shows only when the device supports the provider and the server answers a junk-token probe
+  with 401, not 503 `provider_not_configured`. The probe runs on launch and when AccountPage opens.
+  Google also needs `--dart-define=GOOGLE_CLIENT_ID` / `GOOGLE_SERVER_CLIENT_ID`. Production has no
+  client ids yet (`APPLE_CLIENT_IDS` / `GOOGLE_CLIENT_IDS` on Railway), so no buttons show.
   - To enable Apple: set `CODE_SIGN_ENTITLEMENTS = Runner/Runner.entitlements` for Runner. It is left
     out because a team without the capability can't sign device builds.
   - For Google on iOS: also add `GIDClientID` and the reversed-client-id URL scheme to Info.plist.

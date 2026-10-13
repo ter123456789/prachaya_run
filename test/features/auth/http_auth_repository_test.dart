@@ -201,13 +201,47 @@ void main() {
       );
     });
 
-    test('offers only the providers the device supports', () async {
+    test('offers the device\'s providers the server is set up for', () async {
+      // A junk token: 401 = the server has client ids, 503 = it does not.
       final r = repo(
-        (_) => json(200, {}),
-        social: _FakeSocial(null, available: {SocialProvider.apple}),
+        (req) => req.url.path == '/auth/apple'
+            ? json(401, {
+                'error': {'code': 'invalid_token', 'message': ''},
+              })
+            : json(503, {
+                'error': {'code': 'provider_not_configured', 'message': ''},
+              }),
+        social: _FakeSocial(
+          null,
+          available: {SocialProvider.apple, SocialProvider.google},
+        ),
       );
       expect(await r.availableProviders(), {SocialProvider.apple});
+      expect(requests.map((q) => jsonDecode(q.body)), [
+        {'identityToken': 'probe'},
+        {'idToken': 'probe'},
+      ]);
+      expect(tokens.session, isNull);
+    });
+
+    test('a provider this device lacks is never asked about', () async {
+      final r = repo(
+        (_) => json(401, {
+          'error': {'code': 'invalid_token', 'message': ''},
+        }),
+        social: _FakeSocial(null, available: {SocialProvider.google}),
+      );
+      expect(await r.availableProviders(), {SocialProvider.google});
+      expect(requests.single.url.path, '/auth/google');
       expect(await repo((_) => json(200, {})).availableProviders(), isEmpty);
+    });
+
+    test('offline: no social buttons', () async {
+      final r = repo(
+        (_) => throw http.ClientException('offline'),
+        social: _FakeSocial(null, available: {SocialProvider.apple}),
+      );
+      expect(await r.availableProviders(), isEmpty);
     });
   });
 }

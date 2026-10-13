@@ -41,6 +41,7 @@ class _AccountPageState extends State<AccountPage> {
   void initState() {
     super.initState();
     context.read<SyncCubit>().refreshPending();
+    context.read<AuthCubit>().refreshProviders();
   }
 
   @override

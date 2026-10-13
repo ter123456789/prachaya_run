@@ -74,6 +74,12 @@ class AuthCubit extends Cubit<AuthState> {
 
   Future<void> start() async {
     _setUser(await _repository.currentUser());
+    await refreshProviders();
+  }
+
+  /// Asks again which Apple / Google buttons to show (the server may have
+  /// been set up since, or the device was offline).
+  Future<void> refreshProviders() async {
     final providers = await _repository.availableProviders();
     if (isClosed) return;
     emit(

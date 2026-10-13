@@ -28,11 +28,6 @@ abstract interface class SocialCredentialSource {
   Future<SocialCredential> obtain(SocialProvider provider);
 }
 
-/// Apple / Google sign-in stay hidden until the provider accounts exist
-/// (Apple Developer team with Sign in with Apple, Google client ids) and the
-/// server has the client ids: `--dart-define=SOCIAL_SIGN_IN=true`.
-const _socialSignIn = bool.fromEnvironment('SOCIAL_SIGN_IN');
-
 /// Google client ids, set at build time (empty = Google hidden):
 /// `--dart-define=GOOGLE_CLIENT_ID=<iOS client id>` and
 /// `--dart-define=GOOGLE_SERVER_CLIENT_ID=<web client id>` (Android).
@@ -50,7 +45,6 @@ class PluginSocialCredentialSource implements SocialCredentialSource {
 
   @override
   Future<bool> isAvailable(SocialProvider provider) async {
-    if (!_socialSignIn) return false;
     return switch (provider) {
       SocialProvider.apple =>
         Platform.isIOS && await SignInWithApple.isAvailable(),
