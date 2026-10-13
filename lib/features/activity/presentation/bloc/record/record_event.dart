@@ -21,6 +21,11 @@ final class RecordResumed extends RecordEvent {
   const RecordResumed();
 }
 
+/// Ends the current lap (record page or Live Activity button).
+final class RecordLapped extends RecordEvent {
+  const RecordLapped();
+}
+
 final class RecordFinished extends RecordEvent {
   const RecordFinished();
 }

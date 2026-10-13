@@ -29,6 +29,8 @@ void main() {
         shoeRepository: InMemoryShoeRepository(),
         workoutRepository: InMemoryWorkoutRepository(),
         settingsRepository: InMemorySettingsRepository(),
+        reminderScheduler: FakeReminderScheduler(),
+        reminderSettings: InMemoryReminderSettings(),
         locationTracker: FakeLocationTracker(),
         photoSource: FakePhotoSource(),
         imageSink: FakeImageSink(),
@@ -141,22 +143,23 @@ void main() {
     tester,
   ) async {
     await pumpApp(tester, InMemoryActivityRepository());
-    // The avatar opens the profile; its sync strip leads to the account.
+    // The avatar opens the profile; signed out (08 guest) it invites to
+    // sign up, which opens the account screen on the sign-up tab.
     await tester.tap(find.byTooltip('บัญชี').first);
     await tester.pumpAndSettle();
     expect(find.text('ข้อมูลผู้ใช้'), findsOneWidget);
-    await tester.tap(find.text('เข้าสู่ระบบเพื่อซิงก์'));
+    await tester.tap(find.text('สมัครสมาชิกหรือเข้าสู่ระบบ'));
     await tester.pumpAndSettle();
 
     expect(find.text('ซิงก์กิจกรรมข้ามเครื่อง'), findsOneWidget);
     await tester.enterText(find.byType(TextField).first, 'not-an-email');
     await tester.enterText(find.byType(TextField).last, 'password1');
-    await tester.tap(find.widgetWithText(FilledButton, 'เข้าสู่ระบบ'));
+    await tester.tap(find.widgetWithText(FilledButton, 'สร้างบัญชี'));
     await tester.pumpAndSettle();
     expect(find.text('การแจ้งเตือนรูปแบบ'), findsOneWidget);
 
     await tester.enterText(find.byType(TextField).first, 'me@run.co');
-    await tester.tap(find.widgetWithText(FilledButton, 'เข้าสู่ระบบ'));
+    await tester.tap(find.widgetWithText(FilledButton, 'สร้างบัญชี'));
     await tester.pumpAndSettle();
     expect(find.text('me@run.co'), findsOneWidget);
     expect(find.text('ซิงก์ตอนนี้'), findsOneWidget);

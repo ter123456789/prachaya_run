@@ -18,10 +18,12 @@ lib/
     data/                   # sqflite + geolocator implementations of the ports
       sync/                 # ActivitySyncEngine: push pending changes, pull updatedSince feed
     presentation/           # BLoC/Cubit (flutter_bloc), pages, widgets
-  features/auth/            # email + password account (own JWT on rinning_API) + the profile
-    domain/                 # AuthUser, UserProfile, Auth/ProfileRepository ports, validation
-    data/                   # HttpAuthRepository, LocalFirstProfileRepository, ProfileStore/ProfileSync
-    presentation/           # AuthCubit, ProfileCubit, AccountPage (sign in/up, sync, sign out, delete)
+  features/auth/            # account (email + password, Sign in with Apple / Google; own JWT) + profile
+    domain/                 # AuthUser, UserProfile, GuestDataSummary, Auth/Profile/GuestDataRepository
+    data/                   # HttpAuthRepository, SocialCredentialSource (plugins), LocalFirstProfileRepository,
+                            #   ProfileStore/ProfileSync
+    presentation/           # AuthCubit, ProfileCubit, GuestLinkCubit, AccountPage (07), GuestLinkSheet (07.1),
+                            #   guest_widgets (08/09 guest invites)
   features/athlete/         # Stitch 08 profile: body data, HR zones, all-time stats, shoes, units
     domain/                 # Shoe, ShoeRepository/SettingsRepository ports, heart_rate_zones
                             #   (Tanaka), body_metrics (BMI), all_time_stats, shoe_usage
@@ -33,6 +35,11 @@ lib/
                             #   phases, estimate, TrainingWeek, completion), CompleteWorkoutForActivity
     data/                   # OfflineFirstWorkoutRepository, WorkoutJsonMapper
     presentation/           # SchedulePage, WorkoutSheet, TrainingTeaser, TrainingCubit, WorkoutDraftCubit
+  features/reminders/       # local notifications: plan reminders, weekly goal, 06:00 weather
+    domain/                 # Reminder(Target), ReminderSettings, ReminderScheduler/SettingsRepository ports,
+                            #   reminder_plan (due times, ids, goal crossing, next morning)
+    data/                   # LocalNotificationScheduler (flutter_local_notifications), KvReminderSettingsRepository
+    presentation/           # RemindersCubit, ReminderCoordinator + ReminderTexts, ReminderListeners (app-level)
   features/debug/           # debug builds only (kDebugMode in main.dart): floating bug button
     domain/                 # GpsSimulation, RouteSimulator (pure route → GPS fixes), DebugTools port
     data/                   # SimulatedLocationTracker, VirtualClock (sped-up time), DebugHttpClient
@@ -55,6 +62,8 @@ Rules (enforced for every feature by `test/architecture_test.dart`):
   their own `*_json_mapper.dart` (the record store keeps their API JSON as-is in `data`).
 - Cross-feature hooks go through domain typedefs, composed in `app.dart`: `SaveActivity` takes a
   `DefaultShoe` (primary shoe for runs/hikes) and `onSaved` hooks (CompleteWorkoutForActivity).
+- Plugin wrappers stay in `data/` (architecture_test also bans flutter_local_notifications, timezone,
+  flutter_tts, sign_in_with_apple and google_sign_in from presentation).
 - Add a use case only when it holds logic (e.g. `SaveActivity` validates distance).
   Simple reads/deletes go straight from cubit to the repository port.
 
@@ -65,11 +74,25 @@ Rules (enforced for every feature by `test/architecture_test.dart`):
 - Offline-first: `OfflineFirstActivityRepository` always writes SQLite, then schedules a sync.
   Activity ids are client UUIDs (`uuidV4`). An account is optional; signed out, nothing is sent.
 - Rows are scoped by `owner_id`: an account sees its own rows plus unclaimed ones (recorded signed
-  out, `owner_id IS NULL`), which its next sync claims. Other accounts' rows stay on disk, hidden.
+  out, `owner_id IS NULL`). Other accounts' rows stay on disk, hidden.
+- Sync never claims unowned rows by itself. After a sign-in with data on the device, `app.dart` shows
+  `GuestLinkSheet` (Stitch 07.1, `DeviceGuestData`). **Merge** calls `ActivitySyncEngine.claimGuestData`
+  (activities, photos, profile, shoes, plans) and syncs. **Keep** parks the rows under
+  `owner_id = '~device'` and the profile under `profile:device-only`, so the account doesn't see or
+  send them; signing out restores them. **Cancel** signs out. The summary shows count, distance,
+  time and PB 5K/10K (`best_efforts.dart`, from the tracks).
+- Sign in with Apple / Google (api.md v1.3): `POST /auth/apple` / `/auth/google` with the provider's ID token.
+  The buttons show only in builds with `--dart-define=SOCIAL_SIGN_IN=true`, plus `GOOGLE_CLIENT_ID` /
+  `GOOGLE_SERVER_CLIENT_ID` for Google. They stay off until the Apple Developer team and Google client
+  ids exist and Railway has `APPLE_CLIENT_IDS` / `GOOGLE_CLIENT_IDS`.
+  - To enable Apple: set `CODE_SIGN_ENTITLEMENTS = Runner/Runner.entitlements` for Runner. It is left
+    out because a team without the capability can't sign device builds.
+  - For Google on iOS: also add `GIDClientID` and the reversed-client-id URL scheme to Info.plist.
+  - 503 `provider_not_configured` shows as "not available"; 503 `provider_unavailable` is retryable.
 - DB v4 adds `activities.shoe_id` and the `shoes` / `planned_workouts` tables (id, owner_id,
   data JSON, updated_at, deleted_at, synced — same scoping, LWW and tombstones as activities).
   The profile is in `kv` (`profile:<userId>`, `profile:local` while signed out, `_dirty` flag).
-- Sync order: claimUnowned → push → pull → photos → participants (ProfileSync, /shoes, /workouts).
+- Sync order: push → pull → photos → participants (ProfileSync, /shoes, /workouts).
   503 `storage_unavailable` (server photo storage down) keeps photos queued, still syncs the
   participants, and reports the run as `failed` so it is retried.
   ProfileSync PATCHes every field when dirty (so clearing reaches the server), else GETs `/me`;
@@ -97,17 +120,47 @@ Rules (enforced for every feature by `test/architecture_test.dart`):
   `features/activity/presentation/widgets/route_canvas.dart` draws the self-animating luminescent route.
 - Not in the app on purpose: heart rate (no sensor; detail shows estimated calories instead),
   notification bell, place names. Profile 08 hides resting HR, VO2 Max, fitness age, sensors,
-  Strava/Apple Health and route privacy; schedule 09 hides multi-week plan names, best-time
-  windows and run reminders — no data source. Never show the design's sample values.
+  Strava/Apple Health and route privacy; schedule 09 hides multi-week plan names and best-time
+  windows — no data source. Never show the design's sample values.
 - HR zones: Max HR = user value, else Tanaka `208 − 0.7 × age` (birth year typed in พ.ศ. or ค.ศ.);
   zones 1–5 = 50–60 … 90–100 % (ceil of each lower bound, no overlap). Focus zone 2.
 - Units: `UnitsCubit` (device setting in `kv`) → `context.units` everywhere (distance, pace, speed,
   splits, wind, share image). Plans store pace per km; shown per the chosen unit.
 - Navigation: avatar → ProfilePage (works signed out) → sync strip / buttons → AccountPage.
+  Signed out, ProfilePage is Stitch 08 guest (LOCAL ONLY, invite, device data, real account benefits) and
+  SchedulePage ends with the 09 "Athletic Pass" invite. Nothing is locked; only real benefits are listed
+  (no VO2 Max, watch sync, Strava/Apple Health, "+18.4%").
+- Reminders (all local, device settings in `kv` `settings.reminders`):
+  - **Plan reminder:** fires 15/30/60 min before each plan still ahead (not rest, not done), capped at 40
+    for iOS's 64-notification limit.
+  - **When they're re-planned:** ReminderListeners re-plans when TrainingCubit's plans change (save,
+    delete, sync pull, account switch, launch), on settings or unit changes, and when the latest activity
+    changes (weather place).
+  - **Weekly goal:** shown once when the week passes `kWeeklyGoalMeters`.
+  - **Weather:** next 06:00 Open-Meteo forecast where the last activity started (`WeatherService.forecast`).
+  - **Taps:** the payload is `<kind>|schedule:YYYY-MM-DD` or `home`; a schedule tap opens
+    `SchedulePage.route(day:)`. The OS asks for permission the first time one is turned on, or when a
+    plan exists.
+- Recording outside the app (`RecordingCompanion` in app.dart): every whole km/mi it speaks a Thai cue
+  (`TtsVoiceCoach`; "Audio Cues" setting; iOS `audio` background mode).
+  - **iOS Live Activity / Dynamic Island:** it mirrors `RecordState` (throttled 3 s, immediate on
+    pause/lap; the clock runs itself with `Text(timerInterval:)`).
+    - Native code: `ios/RecordingWidget` (widget extension, iOS 16.2+, Obsidian tokens mirrored in Swift)
+      and `ios/Shared` (attributes, LiveActivityIntents, compiled into both targets).
+    - Bridge: `Runner/LiveActivityBridge.swift` on channel `prachaya/live_activity`.
+    - Buttons: Pause/Resume/Lap post `.recordingCommand` in the app process, which comes back to Dart
+      as `LiveCommand`.
+  - **Android:** an ongoing notification with the same buttons (`AndroidRecordingNotification`).
+  - **Laps:** live only (`RecordingSession.lap`, `RecordLapped`); activities and the API keep no laps.
   Dashboard has a "ตารางซ้อม" teaser below the latest activity → SchedulePage.
 - Motion: entrance staggers, count-ups, ring/bar sweeps, sliding tabs, press springs, haptics. Every
   looping animation stops under OS "remove animations" (widget tests run with it on so pumpAndSettle ends).
 - Font files in `assets/fonts/` (OFL). Launch: native splash `#0C0D0B`, then `core/splash/SplashPage`.
+- Logo (Stitch "Modern Luxury Kinetic"):
+  - `assets/icon/app_icon.png`: full-bleed monogram, no wordmark; used for the launcher icons.
+  - `app_icon_foreground.png`: Android adaptive icon and Android 12 splash.
+  - `logo.png`: squircle with the wordmark, on SplashPage.
+  - Regenerate with `dart run flutter_launcher_icons` and `dart run flutter_native_splash:create`.
 - Maps use CARTO dark tiles (attribution: OpenStreetMap contributors, CARTO).
 
 ## State management
@@ -132,4 +185,7 @@ Rules (enforced for every feature by `test/architecture_test.dart`):
 - End to end on a simulator against the real backend (screenshots → `build/e2e_screenshots/`):
   `flutter drive --driver=test_driver/integration_test.dart --target=integration_test/app_e2e_test.dart -d <id>`
   (add `--dart-define=API_BASE_URL=...` for another server; `--dart-define=E2E_SKIP_PHOTO=true` skips
-  only the photo checks when the server's file storage is down; the test account is always deleted)
+  only the photo checks when the server's file storage is down; the test accounts are always deleted).
+  - It covers both 07.1 choices: merge, where profile, shoe and plan reach the server; and keep, where
+    a second account gets nothing and the plan returns after sign-out.
+  - It turns plan reminders off on the test device, so no OS permission prompt waits for a tap.

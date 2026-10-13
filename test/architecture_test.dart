@@ -49,6 +49,12 @@ void main() {
                 'package:share_plus',
                 'package:http',
                 'package:flutter_secure_storage',
+                'package:flutter_local_notifications',
+                'package:flutter_timezone',
+                'package:timezone',
+                'package:flutter_tts',
+                'package:sign_in_with_apple',
+                'package:google_sign_in',
               ].any(uri.startsWith) ||
               uri.contains('core/network/'))
             '$file -> $uri',

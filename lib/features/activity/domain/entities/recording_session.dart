@@ -25,6 +25,7 @@ class RecordingSession {
   final double minStepMeters;
 
   final List<List<TrackPoint>> _segments = [<TrackPoint>[]];
+  final List<LapMark> _laps = [];
   final ElevationGainCounter _elevation = ElevationGainCounter();
   Duration _accumulated = Duration.zero;
   DateTime? _runningSince;
@@ -33,6 +34,22 @@ class RecordingSession {
   bool get isPaused => _runningSince == null;
   double get distanceMeters => _distance;
   double get elevationGainMeters => _elevation.gain;
+
+  /// Where each finished lap ended (live only: activities keep no laps).
+  List<LapMark> get laps => UnmodifiableListView(_laps);
+
+  /// 1 for the first lap.
+  int get lapNumber => _laps.length + 1;
+
+  /// Ends the current lap at the distance and moving time so far. Ignored
+  /// while paused or before anything was covered since the last lap.
+  bool lap(DateTime now) {
+    if (isPaused) return false;
+    final last = _laps.isEmpty ? null : _laps.last;
+    if (_distance <= (last?.distanceMeters ?? 0)) return false;
+    _laps.add(LapMark(distanceMeters: _distance, movingTime: movingTime(now)));
+    return true;
+  }
 
   /// Read-only view; it changes as points are added.
   List<List<TrackPoint>> get segments => UnmodifiableListView(_segments);
@@ -86,4 +103,12 @@ class RecordingSession {
     movingTime: movingTime(endedAt),
     segments: _segments.where((s) => s.isNotEmpty).toList(),
   );
+}
+
+/// The end of one lap: distance and moving time from the start.
+class LapMark {
+  const LapMark({required this.distanceMeters, required this.movingTime});
+
+  final double distanceMeters;
+  final Duration movingTime;
 }

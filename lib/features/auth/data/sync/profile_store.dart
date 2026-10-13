@@ -47,4 +47,20 @@ class ProfileStore {
       _kv.write(_key(userId), ProfileJsonMapper.toJson(profile));
 
   Future<void> remove(String? userId) => _kv.remove(_key(userId));
+
+  static const _parkedKey = 'profile:device-only';
+
+  /// Sign-in "keep on this device": the signed-out profile is set aside so
+  /// the account neither shows nor claims it.
+  Future<void> park() => _move(_key(null), _parkedKey);
+
+  /// Signed out again: the set-aside profile is the device's own again.
+  Future<void> restoreParked() => _move(_parkedKey, _key(null));
+
+  Future<void> _move(String from, String to) async {
+    final json = await _kv.read(from);
+    if (json == null) return;
+    await _kv.write(to, json);
+    await _kv.remove(from);
+  }
 }

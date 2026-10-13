@@ -27,6 +27,7 @@ class RecordBloc extends Bloc<RecordEvent, RecordState> {
     on<RecordStarted>(_onStarted);
     on<RecordPaused>(_onPaused);
     on<RecordResumed>(_onResumed);
+    on<RecordLapped>(_onLapped);
     on<RecordFinished>(_onFinished);
     on<RecordReset>(_onReset);
     on<_LocationReceived>(_onLocationReceived);
@@ -91,6 +92,21 @@ class RecordBloc extends Bloc<RecordEvent, RecordState> {
     session.resume(_clock());
     _startStreams();
     emit(_snapshot(session, RecordStatus.recording));
+  }
+
+  void _onLapped(RecordLapped event, Emitter<RecordState> emit) {
+    final session = _session;
+    if (session == null || state.status != RecordStatus.recording) return;
+    if (!session.lap(_clock())) return;
+    final mark = session.laps.last;
+    emit(
+      state.copyWith(
+        lapNumber: session.lapNumber,
+        lapStartMeters: mark.distanceMeters,
+        lapStartTime: mark.movingTime,
+        movingTime: mark.movingTime,
+      ),
+    );
   }
 
   Future<void> _onFinished(

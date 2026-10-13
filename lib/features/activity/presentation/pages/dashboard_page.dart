@@ -34,9 +34,6 @@ import '../bloc/record/record_bloc.dart';
 import '../widgets/route_canvas.dart';
 import 'activity_detail_page.dart';
 
-/// Weekly distance goal shown on the ring. Fixed for now.
-const double kWeeklyGoalMeters = 20000;
-
 class DashboardPage extends StatelessWidget {
   const DashboardPage({
     super.key,

@@ -18,6 +18,11 @@ import 'package:prachaya_run/features/debug/presentation/debug_cubit.dart';
 import 'package:prachaya_run/features/training/domain/entities/planned_workout.dart';
 import 'package:prachaya_run/features/training/presentation/bloc/training_cubit.dart';
 import 'package:prachaya_run/main.dart' as app;
+import 'package:prachaya_run/features/auth/presentation/widgets/guest_link_sheet.dart';
+import 'package:prachaya_run/features/reminders/presentation/bloc/reminders_cubit.dart';
+import 'package:prachaya_run/features/auth/presentation/bloc/auth_cubit.dart';
+import 'package:prachaya_run/features/activity/presentation/activity_refresh.dart';
+import 'package:prachaya_run/features/auth/presentation/bloc/profile_cubit.dart';
 
 /// End to end on a simulator against the real rinning_API at
 /// [apiBaseUrl]: a profile, shoe and plan made signed out, sign up, sample
@@ -31,6 +36,8 @@ void main() {
   final binding = IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
   final email = 'e2e+${DateTime.now().millisecondsSinceEpoch}@prachaya.run';
+  // Second account: signs up with device data and keeps it on the device.
+  final email2 = 'e2e+${DateTime.now().millisecondsSinceEpoch}k@prachaya.run';
 
   /// `--dart-define=E2E_SKIP_PHOTO=true` skips only the photo checks, for a
   /// server whose file storage is down; every other step still runs.
@@ -101,23 +108,48 @@ void main() {
     // Never leave a test account behind (e.g. on production), even when a
     // step fails: log in again and delete it. A 401 means it is gone.
     addTearDown(() async {
-      final login = await http.post(
-        Uri.parse('$apiBaseUrl/auth/login'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'email': email, 'password': password}),
-      );
-      if (login.statusCode != 200) return;
-      final token =
-          (jsonDecode(login.body) as Map<String, Object?>)['accessToken'];
-      final deleted = await http.delete(
-        Uri.parse('$apiBaseUrl/me'),
-        headers: {'Authorization': 'Bearer $token'},
-      );
-      debugPrint('e2e cleanup: DELETE /me → ${deleted.statusCode}');
+      for (final address in [email, email2]) {
+        final login = await http.post(
+          Uri.parse('$apiBaseUrl/auth/login'),
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode({'email': address, 'password': password}),
+        );
+        if (login.statusCode != 200) continue;
+        final token =
+            (jsonDecode(login.body) as Map<String, Object?>)['accessToken'];
+        final deleted = await http.delete(
+          Uri.parse('$apiBaseUrl/me'),
+          headers: {'Authorization': 'Bearer $token'},
+        );
+        debugPrint(
+          'e2e cleanup: DELETE /me ($address) → ${deleted.statusCode}',
+        );
+      }
     });
     await app.main();
     await waitFor(tester, find.text('พร้อมออกไปวิ่งหรือยัง?'));
     final home = tester.element(find.byType(HomePage));
+    // Plan reminders off on the test device: turning them on asks the OS,
+    // and its permission prompt would wait for a tap.
+    final reminders = home.read<RemindersCubit>();
+    await reminders.load();
+    await reminders.setWorkoutLead(null);
+
+    /// Scrolls the 07.1 sheet to [f] and taps it.
+    Future<void> tapInGuestSheet(Finder f) async {
+      await tester.scrollUntilVisible(
+        f,
+        200,
+        scrollable: find
+            .descendant(
+              of: find.byType(GuestLinkSheet),
+              matching: find.byType(Scrollable),
+            )
+            .first,
+      );
+      await tester.tap(f);
+      await wait(tester, 800);
+    }
 
     Future<void> toTop() async {
       await tester.drag(find.byType(Scrollable).first, const Offset(0, 4000));
@@ -130,6 +162,14 @@ void main() {
         300,
         scrollable: find.byType(Scrollable).first,
       );
+      // Built can still mean partly under the edge, or under the floating
+      // debug button mid-screen: bring it up near the top.
+      await tester.ensureVisible(f);
+      await wait(tester, 300);
+      final y = tester.getCenter(f).dy;
+      if (y > 220) {
+        await tester.drag(find.byType(Scrollable).first, Offset(0, 180 - y));
+      }
       await wait(tester);
     }
 
@@ -153,6 +193,11 @@ void main() {
       await tester.tap(find.text('ออกจากระบบ').last);
       await waitFor(tester, find.text('เข้าสู่ระบบเพื่อซิงก์ข้ามเครื่อง'));
     }
+    // Start from an empty device: 07.1 then counts only what this test made.
+    await home.read<DebugCubit>().clearLocal();
+    await home.refreshActivities();
+    home.read<ProfileCubit>().load();
+    await wait(tester, 800);
     await toTop();
 
     // Body data through the edit sheet, signed out (device profile).
@@ -164,7 +209,8 @@ void main() {
     await enterField(3, '2540'); // พ.ศ. → 1997
     await enterField(4, '');
     await tester.tap(find.text('บันทึกโปรไฟล์'));
-    await waitFor(tester, find.text('BMI 22.9 • สมส่วน'));
+    await wait(tester, 800);
+    await scrollTo(find.text('BMI 22.9 • สมส่วน'));
 
     // A shoe, signed out.
     await scrollTo(find.text('เพิ่มอุปกรณ์'));
@@ -195,15 +241,18 @@ void main() {
       ),
     );
 
-    // --- Sign up through the UI: everything made signed out is claimed ---
+    // --- Sign up from the 08 guest invite; 07.1: merge the device data ---
     await toTop();
-    await tester.tap(find.text('เข้าสู่ระบบเพื่อซิงก์'));
+    await tester.tap(find.text('สมัครสมาชิกหรือเข้าสู่ระบบ'));
     await waitFor(tester, find.text('ซิงก์กิจกรรมข้ามเครื่อง'));
-    await tester.tap(find.text('สมัครสมาชิก'));
-    await wait(tester);
     await tester.enterText(find.byType(TextField).first, email);
     await tester.enterText(find.byType(TextField).last, password);
     await tester.tap(find.text('สร้างบัญชี'));
+    await waitFor(tester, find.text('ผูกและโอนย้ายข้อมูลเข้าบัญชี'));
+    expect(find.text('รองเท้า 1 • แผน 1 • โปรไฟล์'), findsOneWidget);
+    expect(find.text(email), findsWidgets);
+    await shot(tester, '02a_guest_link');
+    await tapInGuestSheet(find.byKey(const Key('guest-merge')));
     await waitFor(tester, find.text('ซิงก์ตอนนี้'));
     expect(find.text(email), findsOneWidget);
     await home.read<SyncCubit>().sync();
@@ -467,5 +516,51 @@ void main() {
       body: jsonEncode({'email': email, 'password': password}),
     );
     expect(gone.statusCode, 401);
+
+    // --- 07.1 the other way: keep the device data, nothing is sent ---
+    final keptId = uuidV4();
+    await training.save(
+      PlannedWorkout(
+        id: keptId,
+        type: WorkoutType.easy,
+        title: 'Kept on this device',
+        scheduledAt: DateTime(now.year, now.month, now.day + 1, 6),
+        distanceMeters: 5000,
+        paceMinSecPerKm: 390,
+        paceMaxSecPerKm: 420,
+      ),
+    );
+    await tester.tap(find.text('สมัครสมาชิก'));
+    await wait(tester);
+    await tester.enterText(find.byType(TextField).first, email2);
+    await tester.enterText(find.byType(TextField).last, password);
+    await tester.tap(find.text('สร้างบัญชี'));
+    await waitFor(tester, find.text('ผูกและโอนย้ายข้อมูลเข้าบัญชี'));
+    expect(find.text('แผน 1'), findsOneWidget);
+    await tapInGuestSheet(find.byKey(const Key('guest-keep')));
+    await waitFor(tester, find.text('ซิงก์ตอนนี้'));
+    await home.read<SyncCubit>().sync();
+    final token2 =
+        (await api(
+              'POST',
+              '/auth/login',
+              body: {'email': email2, 'password': password},
+            ))['accessToken']!
+            as String;
+    final kept = await api(
+      'GET',
+      '/workouts?updatedSince=1970-01-01T00:00:00.000Z',
+      token: token2,
+    );
+    expect(kept['items'], isEmpty, reason: 'kept on the device: not sent');
+    await training.load();
+    expect(training.state.workouts, isEmpty, reason: 'hidden from account 2');
+    // Signed out again, the device's plan is back.
+    await home.read<AuthCubit>().logout();
+    await wait(tester, 1500);
+    await training.load();
+    expect(training.state.workouts.single.id, keptId);
+    await training.delete(keptId);
+    await api('DELETE', '/me', token: token2);
   });
 }

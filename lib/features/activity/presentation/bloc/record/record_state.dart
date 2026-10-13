@@ -28,6 +28,9 @@ final class RecordState extends Equatable {
     this.movingTime = Duration.zero,
     this.failure,
     this.savedActivityId,
+    this.lapNumber = 1,
+    this.lapStartMeters = 0,
+    this.lapStartTime = Duration.zero,
   });
 
   final ActivityType type;
@@ -45,6 +48,14 @@ final class RecordState extends Equatable {
   /// One-shot error; [copyWith] clears it unless passed again.
   final RecordFailure? failure;
   final String? savedActivityId;
+
+  /// The lap under way (1 = first) and where it began.
+  final int lapNumber;
+  final double lapStartMeters;
+  final Duration lapStartTime;
+
+  double get lapDistanceMeters => distanceMeters - lapStartMeters;
+  Duration get lapTime => movingTime - lapStartTime;
 
   bool get isActive =>
       status == RecordStatus.recording || status == RecordStatus.paused;
@@ -64,6 +75,9 @@ final class RecordState extends Equatable {
     Duration? movingTime,
     RecordFailure? failure,
     String? savedActivityId,
+    int? lapNumber,
+    double? lapStartMeters,
+    Duration? lapStartTime,
   }) => RecordState(
     type: type ?? this.type,
     status: status ?? this.status,
@@ -74,6 +88,9 @@ final class RecordState extends Equatable {
     movingTime: movingTime ?? this.movingTime,
     failure: failure,
     savedActivityId: savedActivityId ?? this.savedActivityId,
+    lapNumber: lapNumber ?? this.lapNumber,
+    lapStartMeters: lapStartMeters ?? this.lapStartMeters,
+    lapStartTime: lapStartTime ?? this.lapStartTime,
   );
 
   @override
@@ -86,5 +103,6 @@ final class RecordState extends Equatable {
     movingTime,
     failure,
     savedActivityId,
+    lapNumber,
   ];
 }

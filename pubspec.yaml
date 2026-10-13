@@ -47,6 +47,12 @@ dependencies:
   path_provider: ^2.1.6
   http: ^1.6.0
   flutter_secure_storage: ^11.2.0
+  flutter_local_notifications: ^22.3.2
+  timezone: ^0.11.2
+  flutter_timezone: ^5.1.1
+  flutter_tts: ^4.2.5
+  sign_in_with_apple: ^7.0.1
+  google_sign_in: ^7.2.0
 
 dev_dependencies:
   flutter_test:
@@ -79,6 +85,7 @@ flutter:
 
   assets:
     - assets/icon/app_icon.png
+    - assets/icon/logo.png
 
   # To add assets to your application, add an assets section, like this:
   # assets:
@@ -140,7 +147,7 @@ flutter_launcher_icons:
   ios: true
   remove_alpha_ios: true
   adaptive_icon_background: "#0C0D0B"
-  adaptive_icon_foreground: assets/icon/app_icon.png
+  adaptive_icon_foreground: assets/icon/app_icon_foreground.png
 
 # Native launch screen: plain app-dark so there is no white flash before the
 # animated Flutter splash (lib/core/splash). Android 12+ shows the launcher
@@ -150,4 +157,5 @@ flutter_native_splash:
   web: false
   android_12:
     color: "#0C0D0B"
+    image: assets/icon/app_icon_foreground.png
     icon_background_color: "#0C0D0B"

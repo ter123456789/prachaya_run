@@ -19,10 +19,15 @@ import 'features/activity/data/datasources/photo_local_data_source.dart';
 import 'features/activity/data/repositories/http_challenge_repository.dart';
 import 'features/activity/data/repositories/offline_first_activity_repository.dart';
 import 'features/activity/data/repositories/offline_first_photo_repository.dart';
+import 'features/activity/data/services/android_recording_notification.dart';
 import 'features/activity/data/services/geolocator_location_tracker.dart';
+import 'features/activity/data/services/ios_live_activity_mirror.dart';
+import 'features/activity/data/services/tts_voice_coach.dart';
 import 'features/activity/data/services/open_meteo_weather_service.dart';
 import 'features/activity/data/sync/activity_sync_engine.dart';
+import 'features/activity/data/sync/device_guest_data.dart';
 import 'features/auth/data/repositories/http_auth_repository.dart';
+import 'features/auth/data/services/social_credentials.dart';
 import 'features/athlete/data/repositories/kv_settings_repository.dart';
 import 'features/athlete/data/repositories/offline_first_shoe_repository.dart';
 import 'features/auth/data/repositories/local_first_profile_repository.dart';
@@ -34,6 +39,8 @@ import 'features/debug/data/simulated_location_tracker.dart';
 import 'features/debug/data/virtual_clock.dart';
 import 'features/photo_share/data/services/device_image_sink.dart';
 import 'features/photo_share/data/services/image_picker_photo_source.dart';
+import 'features/reminders/data/kv_reminder_settings_repository.dart';
+import 'features/reminders/data/local_notification_scheduler.dart';
 import 'features/training/data/repositories/offline_first_workout_repository.dart';
 
 /// Composition root: the only place that knows concrete implementations.
@@ -75,6 +82,7 @@ Future<void> main() async {
     photos: photos,
   );
 
+  final notifications = LocalNotificationScheduler();
   final realTracker = GeolocatorLocationTracker();
   final clock = kDebugMode ? VirtualClock() : null;
   final simTracker = kDebugMode
@@ -88,6 +96,7 @@ Future<void> main() async {
       authRepository: HttpAuthRepository(
         api,
         tokens,
+        social: PluginSocialCredentialSource(),
         onAccountDeleted: (userId) async {
           await local.purgeOwner(userId);
           await photos.pruneOrphans();
@@ -112,6 +121,22 @@ Future<void> main() async {
         scheduleSync: sync.schedule,
       ),
       settingsRepository: KvSettingsRepository(kv),
+      reminderScheduler: notifications,
+      recordingMirror: Platform.isIOS
+          ? IosLiveActivityMirror()
+          : Platform.isAndroid
+          ? AndroidRecordingNotification(notifications)
+          : null,
+      voiceCoach: TtsVoiceCoach(),
+      reminderSettings: KvReminderSettingsRepository(kv),
+      guestData: DeviceGuestData(
+        activities: local,
+        photos: photos,
+        shoes: shoes,
+        workouts: workouts,
+        profiles: profiles,
+        sync: sync,
+      ),
       photoRepository: OfflineFirstPhotoRepository(photos, sync, tokens),
       challengeRepository: HttpChallengeRepository(api, tokens, kv),
       weatherService: OpenMeteoWeatherService(http.Client(), kv),

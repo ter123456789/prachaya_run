@@ -267,6 +267,10 @@ void main() {
 
       tokens.session = u1;
       expect(await repository.getAll(), hasLength(1));
+      // Sync alone never takes signed-out data (the user chooses: 07.1).
+      await engine.sync();
+      expect(server.activities, isNot(contains(_id)));
+      await engine.claimGuestData('u1');
       await engine.sync();
       expect(server.activities, contains(_id));
 

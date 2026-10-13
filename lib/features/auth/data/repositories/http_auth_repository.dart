@@ -4,18 +4,22 @@ import '../../../../core/network/api_client.dart';
 import '../../../../core/network/token_store.dart';
 import '../../domain/entities/auth_user.dart';
 import '../../domain/repositories/auth_repository.dart';
+import '../services/social_credentials.dart';
 
 class HttpAuthRepository implements AuthRepository {
   HttpAuthRepository(
     this._api,
     this._tokens, {
+    SocialCredentialSource? social,
     Future<void> Function(String userId)? onAccountDeleted,
-  }) : _onAccountDeleted = onAccountDeleted {
+  }) : _social = social,
+       _onAccountDeleted = onAccountDeleted {
     _api.sessionEnded.listen((_) => _changes.add(null));
   }
 
   final ApiClient _api;
   final TokenStore _tokens;
+  final SocialCredentialSource? _social;
 
   /// Removes the account's rows and files from this device.
   final Future<void> Function(String userId)? _onAccountDeleted;
@@ -39,6 +43,45 @@ class HttpAuthRepository implements AuthRepository {
     required String email,
     required String password,
   }) => _signIn('/auth/register', email, password);
+
+  @override
+  Future<Set<SocialProvider>> availableProviders() async {
+    final social = _social;
+    if (social == null) return const {};
+    return {
+      for (final p in SocialProvider.values)
+        if (await social.isAvailable(p)) p,
+    };
+  }
+
+  @override
+  Future<AuthUser> signInWith(SocialProvider provider) async {
+    final social = _social;
+    if (social == null) {
+      throw const AuthException(AuthError.providerUnavailable);
+    }
+    final SocialCredential credential;
+    try {
+      credential = await social.obtain(provider);
+    } on SocialSignInCancelled {
+      throw const AuthException(AuthError.cancelled);
+    } catch (_) {
+      throw const AuthException(AuthError.unknown);
+    }
+    return _authenticate(
+      switch (provider) {
+        SocialProvider.apple => '/auth/apple',
+        SocialProvider.google => '/auth/google',
+      },
+      switch (provider) {
+        SocialProvider.apple => {
+          'identityToken': credential.idToken,
+          'fullName': ?credential.fullName,
+        },
+        SocialProvider.google => {'idToken': credential.idToken},
+      },
+    );
+  }
 
   @override
   Future<void> logout() async {
@@ -74,14 +117,13 @@ class HttpAuthRepository implements AuthRepository {
     _changes.add(null);
   }
 
-  Future<AuthUser> _signIn(String path, String email, String password) async {
+  Future<AuthUser> _signIn(String path, String email, String password) =>
+      _authenticate(path, {'email': email.trim(), 'password': password});
+
+  Future<AuthUser> _authenticate(String path, Map<String, Object?> body) async {
     try {
       final json =
-          await _api.post(path, {
-                'email': email.trim(),
-                'password': password,
-              }, auth: false)
-              as Map<String, Object?>;
+          await _api.post(path, body, auth: false) as Map<String, Object?>;
       final session = StoredSession.fromAuthJson(json);
       await _tokens.write(session);
       final user = _user(session);
@@ -92,6 +134,9 @@ class HttpAuthRepository implements AuthRepository {
         'invalid_credentials' => AuthError.invalidCredentials,
         'email_taken' => AuthError.emailTaken,
         'validation_error' => AuthError.invalidInput,
+        'provider_not_configured' => AuthError.providerUnavailable,
+        // The server could not reach Apple's / Google's keys: retry later.
+        'provider_unavailable' => AuthError.network,
         _ => AuthError.unknown,
       });
     } on NetworkException {

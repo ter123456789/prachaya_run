@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:prachaya_run/features/auth/domain/entities/auth_user.dart';
 import 'package:prachaya_run/features/training/domain/entities/planned_workout.dart';
 
 import '../../../helpers/fakes.dart';
@@ -172,5 +173,44 @@ void main() {
     await openSchedule(tester);
     expect(find.text('ซ้อมสำเร็จแล้ว ดูกิจกรรม'), findsOneWidget);
     await seeRich(tester, 'ความถี่สัปดาห์นี้: 1 / 1 ครั้ง');
+  });
+
+  testWidgets('09 guest: an invitation at the end, nothing locked', (
+    tester,
+  ) async {
+    final app = TestApp();
+    await app.pump(tester);
+    await openSchedule(tester);
+    // The planner itself is right there.
+    expect(find.text('เพิ่มตาราง'), findsOneWidget);
+    final pass = find.text('PRACHAYA ATHLETIC PASS');
+    await tester.scrollUntilVisible(
+      pass,
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(find.textContaining('+18.4%'), findsNothing);
+    expect(find.textContaining('Garmin'), findsNothing);
+    final login = find.text('มีบัญชีอยู่แล้ว? เข้าสู่ระบบ');
+    await tester.scrollUntilVisible(
+      login,
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.ensureVisible(login);
+    await tester.pumpAndSettle();
+    await tester.tap(login);
+    await tester.pumpAndSettle();
+    expect(find.text('บัญชี'), findsOneWidget);
+  });
+
+  testWidgets('signed in: no invitation', (tester) async {
+    final app = TestApp();
+    app.auth.user = const AuthUser(id: 'u1', email: 'a@b.co');
+    await app.pump(tester);
+    await openSchedule(tester);
+    await tester.drag(find.byType(Scrollable).first, const Offset(0, -6000));
+    await tester.pumpAndSettle();
+    expect(find.text('PRACHAYA ATHLETIC PASS'), findsNothing);
   });
 }

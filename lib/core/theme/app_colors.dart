@@ -10,6 +10,9 @@ abstract final class AppColors {
   static const surfaceHigh = Color(0xFF292A28);
   static const surfaceHighest = Color(0xFF343532);
 
+  /// Pure black: the Sign in with Apple button (Apple's black style).
+  static const ink = Color(0xFF000000);
+
   static const lime = Color(0xFFD4F36B);
   static const onLime = Color(0xFF11130C);
   static const limeSoft = Color(0x26D4F36B); // lime 15%, selected chips

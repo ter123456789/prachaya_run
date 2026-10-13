@@ -6,6 +6,7 @@ import '../../domain/entities/activity_photo.dart';
 import '../../domain/services/uuid.dart';
 import '../models/remote_activity_summary.dart';
 import 'app_database.dart';
+import '../../../../core/sync/device_owner.dart';
 
 /// A local photo the server has not seen yet.
 class PendingPhoto {
@@ -107,6 +108,18 @@ class PhotoLocalDataSource {
       whereArgs: [activityId],
     );
   }
+
+  /// See ActivityLocalDataSource.parkUnowned.
+  Future<void> parkUnowned() => _db.update(_photos, {
+    'owner_id': kDeviceOnlyOwner,
+  }, where: 'owner_id IS NULL');
+
+  Future<void> restoreDeviceOnly() => _db.update(
+    _photos,
+    {'owner_id': null},
+    where: 'owner_id = ?',
+    whereArgs: [kDeviceOnlyOwner],
+  );
 
   Future<void> claimUnowned(String ownerId) =>
       _db.update(_photos, {'owner_id': ownerId}, where: 'owner_id IS NULL');

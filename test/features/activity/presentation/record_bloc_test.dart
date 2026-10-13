@@ -112,4 +112,33 @@ void main() {
     expect(bloc.state.failure, RecordFailure.locationLost);
     await bloc.close();
   });
+
+  test('a lap restarts the lap distance and time', () async {
+    final bloc = buildBloc()..add(const RecordStarted());
+    await pump();
+    tracker
+      ..emit(pointAt(0))
+      ..emit(pointAt(3));
+    await pump();
+    now = t0.add(const Duration(minutes: 2));
+    bloc.add(const RecordLapped());
+    await pump();
+    expect(bloc.state.lapNumber, 2);
+    expect(bloc.state.lapDistanceMeters, 0);
+    expect(bloc.state.lapTime, Duration.zero);
+
+    tracker.emit(pointAt(5));
+    await pump();
+    now = t0.add(const Duration(minutes: 3));
+    bloc.add(const RecordPaused());
+    await pump();
+    expect(bloc.state.lapDistanceMeters, closeTo(222.4, 0.5));
+    expect(bloc.state.lapTime, const Duration(minutes: 1));
+
+    // Paused: the lap button does nothing.
+    bloc.add(const RecordLapped());
+    await pump();
+    expect(bloc.state.lapNumber, 2);
+    await bloc.close();
+  });
 }

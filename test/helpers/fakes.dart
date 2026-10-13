@@ -25,6 +25,12 @@ import 'package:prachaya_run/features/debug/domain/entities/gps_simulation.dart'
 import 'package:prachaya_run/features/debug/domain/services/debug_tools.dart';
 import 'package:prachaya_run/features/photo_share/domain/services/image_sink.dart';
 import 'package:prachaya_run/features/photo_share/domain/services/photo_source.dart';
+import 'package:prachaya_run/features/auth/domain/entities/guest_data_summary.dart';
+import 'package:prachaya_run/features/auth/domain/repositories/guest_data_repository.dart';
+import 'package:prachaya_run/features/reminders/domain/entities/reminder.dart';
+import 'package:prachaya_run/features/reminders/domain/entities/reminder_settings.dart';
+import 'package:prachaya_run/features/reminders/domain/repositories/reminder_scheduler.dart';
+import 'package:prachaya_run/features/reminders/domain/repositories/reminder_settings_repository.dart';
 
 final t0 = DateTime(2026, 10, 9, 6, 30);
 
@@ -108,9 +114,10 @@ class FakeActivitySync implements ActivitySync {
 }
 
 class FakeAuthRepository implements AuthRepository {
-  FakeAuthRepository({this.user});
+  FakeAuthRepository({this.user, this.providers = const {}});
 
   AuthUser? user;
+  Set<SocialProvider> providers;
   AuthError? failNext;
   final _changes = StreamController<AuthUser?>.broadcast();
 
@@ -142,6 +149,17 @@ class FakeAuthRepository implements AuthRepository {
       throw AuthException(error);
     }
     return user = AuthUser(id: 'u1', email: email);
+  }
+
+  @override
+  Future<Set<SocialProvider>> availableProviders() async => providers;
+
+  final socialSignIns = <SocialProvider>[];
+
+  @override
+  Future<AuthUser> signInWith(SocialProvider provider) {
+    socialSignIns.add(provider);
+    return _signIn('${provider.name}@example.com');
   }
 
   @override
@@ -320,3 +338,68 @@ Activity sampleActivity({ActivityType type = ActivityType.run}) => Activity(
     ],
   ],
 );
+
+class FakeGuestData implements GuestDataRepository {
+  FakeGuestData([this.data = GuestDataSummary.empty]);
+
+  GuestDataSummary data;
+  final calls = <String>[];
+
+  @override
+  Future<GuestDataSummary> summary() async => data;
+
+  @override
+  Future<void> merge(String userId) async {
+    calls.add('merge:$userId');
+    data = GuestDataSummary.empty;
+  }
+
+  @override
+  Future<void> keepOnDevice() async {
+    calls.add('keep');
+    data = GuestDataSummary.empty;
+  }
+
+  @override
+  Future<void> restore() async => calls.add('restore');
+}
+
+class FakeReminderScheduler implements ReminderScheduler {
+  bool allow = true;
+  int permissionRequests = 0;
+  final pending = <ReminderKind, List<Reminder>>{};
+  final shown = <Reminder>[];
+  final _taps = StreamController<ReminderTarget>.broadcast();
+  ReminderTarget? launch;
+
+  void tap(ReminderTarget target) => _taps.add(target);
+
+  @override
+  Future<bool> requestPermission() async {
+    permissionRequests++;
+    return allow;
+  }
+
+  @override
+  Future<void> replace(ReminderKind kind, List<Reminder> reminders) async =>
+      pending[kind] = List.of(reminders);
+
+  @override
+  Future<void> showNow(Reminder reminder) async => shown.add(reminder);
+
+  @override
+  Stream<ReminderTarget> get taps => _taps.stream;
+
+  @override
+  Future<ReminderTarget?> launchTarget() async => launch;
+}
+
+class InMemoryReminderSettings implements ReminderSettingsRepository {
+  ReminderSettings settings = const ReminderSettings();
+
+  @override
+  Future<ReminderSettings> load() async => settings;
+
+  @override
+  Future<void> save(ReminderSettings s) async => settings = s;
+}

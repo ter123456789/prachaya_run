@@ -5,8 +5,17 @@ enum AuthError {
   emailTaken,
   invalidInput,
   network,
+
+  /// The user closed the Apple/Google sheet: not an error to show.
+  cancelled,
+
+  /// The provider is not set up (on this device or on the server).
+  providerUnavailable,
   unknown,
 }
+
+/// Sign in with Apple / Google (api.md v1.3).
+enum SocialProvider { apple, google }
 
 class AuthException implements Exception {
   const AuthException(this.error);
@@ -30,6 +39,14 @@ abstract interface class AuthRepository {
 
   /// Throws [AuthException].
   Future<AuthUser> register({required String email, required String password});
+
+  /// Providers this build and device can offer (Apple on iOS; Google once
+  /// its client ids are configured).
+  Future<Set<SocialProvider>> availableProviders();
+
+  /// Signs in or up with the provider's account. Throws [AuthException]
+  /// ([AuthError.cancelled] when the user backs out).
+  Future<AuthUser> signInWith(SocialProvider provider);
 
   /// Always signs out locally, even when the server cannot be reached.
   Future<void> logout();

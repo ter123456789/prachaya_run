@@ -12,6 +12,9 @@ class TestApp {
   final settings = InMemorySettingsRepository();
   final profile = FakeProfileRepository();
   final auth = FakeAuthRepository();
+  final guest = FakeGuestData();
+  final reminders = FakeReminderScheduler();
+  final reminderSettings = InMemoryReminderSettings();
 
   /// Pumps the whole app on a phone-sized screen with reduced motion (so
   /// looping animations stop and pumpAndSettle ends).
@@ -32,6 +35,9 @@ class TestApp {
         shoeRepository: shoes,
         workoutRepository: workouts,
         settingsRepository: settings,
+        guestData: guest,
+        reminderScheduler: reminders,
+        reminderSettings: reminderSettings,
         locationTracker: FakeLocationTracker(),
         photoSource: FakePhotoSource(),
         imageSink: FakeImageSink(),

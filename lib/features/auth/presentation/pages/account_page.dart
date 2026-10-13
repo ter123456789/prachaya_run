@@ -17,16 +17,20 @@ import '../../../activity/presentation/activity_refresh.dart';
 import '../../../activity/presentation/bloc/history/history_cubit.dart';
 import '../../../activity/presentation/bloc/sync/sync_cubit.dart';
 import '../../../athlete/presentation/units.dart';
+import '../../domain/repositories/auth_repository.dart';
 import '../../domain/services/credentials.dart';
 import '../bloc/auth_cubit.dart';
 import '../bloc/profile_cubit.dart';
 
 /// Sign in / sign up, or the signed-in account with profile and sync.
 class AccountPage extends StatefulWidget {
-  const AccountPage({super.key});
+  const AccountPage({super.key, this.register = false});
 
-  static Route<void> route() =>
-      MaterialPageRoute(builder: (_) => const AccountPage());
+  /// Opens on the sign-up tab instead of sign-in.
+  final bool register;
+
+  static Route<void> route({bool register = false}) =>
+      MaterialPageRoute(builder: (_) => AccountPage(register: register));
 
   @override
   State<AccountPage> createState() => _AccountPageState();
@@ -82,8 +86,9 @@ class _AccountPageState extends State<AccountPage> {
                   ),
                   child: switch (status) {
                     AuthStatus.signedIn => const _SignedIn(key: ValueKey('in')),
-                    AuthStatus.signedOut => const _SignInForm(
-                      key: ValueKey('out'),
+                    AuthStatus.signedOut => _SignInForm(
+                      key: const ValueKey('out'),
+                      register: widget.register,
                     ),
                     AuthStatus.unknown => const Padding(
                       padding: EdgeInsets.all(48),
@@ -137,7 +142,7 @@ class _Hero extends StatelessWidget {
                 Text(
                   'ใช้แอปได้โดยไม่ต้องมีบัญชี เข้าสู่ระบบเมื่ออยากสำรองข้อมูล'
                   'ขึ้นเซิร์ฟเวอร์และเปิดดูจากเครื่องอื่น กิจกรรมที่บันทึกไว้'
-                  'ก่อนหน้าจะถูกย้ายเข้าบัญชีทันที',
+                  'ก่อนหน้าย้ายเข้าบัญชีได้ทันทีเมื่อคุณยืนยัน',
                   style: AppText.body,
                 ),
               ],
@@ -152,7 +157,9 @@ class _Hero extends StatelessWidget {
 enum _Mode { login, register }
 
 class _SignInForm extends StatefulWidget {
-  const _SignInForm({super.key});
+  const _SignInForm({super.key, this.register = false});
+
+  final bool register;
 
   @override
   State<_SignInForm> createState() => _SignInFormState();
@@ -161,7 +168,7 @@ class _SignInForm extends StatefulWidget {
 class _SignInFormState extends State<_SignInForm> {
   final _email = TextEditingController();
   final _password = TextEditingController();
-  var _mode = _Mode.login;
+  late var _mode = widget.register ? _Mode.register : _Mode.login;
   var _obscure = true;
 
   @override
@@ -288,6 +295,17 @@ class _SignInFormState extends State<_SignInForm> {
                   ),
           ),
         ),
+        if (auth.providers.isNotEmpty) ...[
+          const SizedBox(height: 22),
+          const _OrDivider(),
+          const SizedBox(height: 16),
+          for (final p in SocialProvider.values)
+            if (auth.providers.contains(p))
+              Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: _SocialButton(provider: p, busy: busy),
+              ),
+        ],
         AnimatedSize(
           duration: const Duration(milliseconds: 280),
           curve: Curves.easeOutCubic,
@@ -335,6 +353,82 @@ class _SignInFormState extends State<_SignInForm> {
   }
 }
 
+class _OrDivider extends StatelessWidget {
+  const _OrDivider();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Row(
+      children: [
+        Expanded(child: Divider()),
+        Flexible(
+          flex: 4,
+          child: Padding(
+            padding: EdgeInsets.symmetric(horizontal: 12),
+            child: Text(
+              'หรือเข้าสู่ระบบด้วย (SOCIAL SIGN-IN)',
+              style: AppText.monoLabelSm,
+              textAlign: TextAlign.center,
+            ),
+          ),
+        ),
+        Expanded(child: Divider()),
+      ],
+    );
+  }
+}
+
+/// Apple's black button / a neutral Google button. The Google mark is drawn
+/// as a plain "G" so no brand reds enter the palette.
+class _SocialButton extends StatelessWidget {
+  const _SocialButton({required this.provider, required this.busy});
+
+  final SocialProvider provider;
+  final bool busy;
+
+  @override
+  Widget build(BuildContext context) {
+    final apple = provider == SocialProvider.apple;
+    return SizedBox(
+      height: 56,
+      child: OutlinedButton(
+        key: Key('social-${provider.name}'),
+        style: OutlinedButton.styleFrom(
+          backgroundColor: apple ? AppColors.ink : AppColors.surfaceHigh,
+          foregroundColor: AppColors.textPrimary,
+          side: const BorderSide(color: AppColors.glassBorder),
+        ),
+        onPressed: busy
+            ? null
+            : () {
+                FocusScope.of(context).unfocus();
+                context.read<AuthCubit>().signInWith(provider);
+              },
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (apple)
+              const Icon(Icons.apple, size: 26)
+            else
+              Text(
+                'G',
+                style: AppText.headlineSm.copyWith(fontWeight: FontWeight.w800),
+              ),
+            const SizedBox(width: 10),
+            Flexible(
+              child: Text(
+                apple ? 'เข้าสู่ระบบด้วย Apple' : 'เข้าสู่ระบบด้วย Google',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _FailureCard extends StatelessWidget {
   const _FailureCard(this.failure);
 
@@ -362,6 +456,10 @@ class _FailureCard extends StatelessWidget {
       AuthFailure.network => (
         'เชื่อมต่อเซิร์ฟเวอร์ไม่ได้',
         'ตรวจสอบอินเทอร์เน็ตแล้วลองอีกครั้ง กิจกรรมยังบันทึกในเครื่องได้ตามปกติ',
+      ),
+      AuthFailure.providerUnavailable => (
+        'ยังเข้าสู่ระบบด้วยวิธีนี้ไม่ได้',
+        'เซิร์ฟเวอร์ยังไม่ได้เปิดใช้ ลองใช้อีเมลและรหัสผ่านแทน',
       ),
       AuthFailure.unknown => ('เกิดข้อผิดพลาด', 'ลองอีกครั้งภายหลัง'),
     };

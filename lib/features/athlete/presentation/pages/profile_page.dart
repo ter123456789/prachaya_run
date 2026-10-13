@@ -23,6 +23,10 @@ import '../../../auth/domain/entities/user_profile.dart';
 import '../../../auth/presentation/bloc/auth_cubit.dart';
 import '../../../auth/presentation/bloc/profile_cubit.dart';
 import '../../../auth/presentation/pages/account_page.dart';
+import '../../../auth/presentation/widgets/guest_widgets.dart';
+import '../../../activity/domain/entities/weekly_stats.dart';
+import '../../../reminders/domain/entities/reminder_settings.dart';
+import '../../../reminders/presentation/bloc/reminders_cubit.dart';
 import '../../domain/services/all_time_stats.dart';
 import '../../domain/services/body_metrics.dart';
 import '../../domain/services/heart_rate_zones.dart';
@@ -40,11 +44,50 @@ import '../widgets/shoe_sheet.dart';
 ///
 /// Left out on purpose (no data source in the app): resting HR, VO2 Max,
 /// fitness age, connected sensors, Strava / Apple Health, route privacy.
-class ProfilePage extends StatelessWidget {
+///
+/// Signed out it is the 08 guest variant: Local Only, an invitation to sign
+/// up and what an account adds — with every section still usable.
+class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
 
   static Route<void> route() =>
       MaterialPageRoute(builder: (_) => const ProfilePage());
+
+  @override
+  State<ProfilePage> createState() => _ProfilePageState();
+}
+
+class _ProfilePageState extends State<ProfilePage> {
+  final _benefitsKey = GlobalKey();
+  final _scroll = ScrollController();
+
+  @override
+  void dispose() {
+    _scroll.dispose();
+    super.dispose();
+  }
+
+  /// The list builds lazily: jump toward the end (its length is an
+  /// estimate until built) until the benefits exist, then bring them in.
+  void _showBenefits([int tries = 6]) {
+    final target = _benefitsKey.currentContext;
+    if (target != null) {
+      Scrollable.ensureVisible(
+        target,
+        duration: MediaQuery.disableAnimationsOf(context)
+            ? Duration.zero
+            : const Duration(milliseconds: 500),
+        curve: Curves.easeOutCubic,
+        alignment: 0.1,
+      );
+      return;
+    }
+    if (tries == 0 || !_scroll.hasClients) return;
+    _scroll.jumpTo(_scroll.position.maxScrollExtent);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _showBenefits(tries - 1);
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -72,16 +115,49 @@ class ProfilePage extends StatelessWidget {
           bottom: false,
           child: EdgeFade(
             child: ListView(
+              controller: _scroll,
               padding: const EdgeInsets.fromLTRB(16, 4, 16, 40),
               children: [
                 AppTopBar(
                   title: 'ข้อมูลผู้ใช้',
                   onBack: () => Navigator.of(context).maybePop(),
+                  actions: [
+                    if (!signedIn) ...[
+                      const StatusPill(
+                        text: 'LOCAL ONLY',
+                        icon: Icons.phonelink_rounded,
+                        mono: true,
+                      ),
+                      const SizedBox(width: 8),
+                      CircleIconButton(
+                        icon: Icons.edit_outlined,
+                        tooltip: 'แก้ไขโปรไฟล์',
+                        size: 40,
+                        onPressed: edit,
+                      ),
+                    ],
+                  ],
                 ),
                 const SizedBox(height: 12),
-                stagger(
-                  _Header(profile: profile, signedIn: signedIn, onEdit: edit),
-                ),
+                if (signedIn)
+                  stagger(
+                    _Header(profile: profile, signedIn: signedIn, onEdit: edit),
+                  )
+                else ...[
+                  stagger(_GuestModeLine(name: profile.displayName)),
+                  const SizedBox(height: 12),
+                  stagger(GuestHeroCard(onWhy: _showBenefits)),
+                  const SizedBox(height: 16),
+                  stagger(
+                    DeviceDataCard(
+                      activityCount: activities.length,
+                      distanceMeters: activities.fold(
+                        0,
+                        (sum, a) => sum + a.distanceMeters,
+                      ),
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 20),
                 stagger(
                   const Padding(
@@ -109,12 +185,53 @@ class ProfilePage extends StatelessWidget {
                 stagger(const _GearCard()),
                 const SizedBox(height: 16),
                 stagger(const _SettingsCard()),
+                if (!signedIn) ...[
+                  const SizedBox(height: 20),
+                  stagger(GuestBenefitsGrid(key: _benefitsKey)),
+                ],
                 const SizedBox(height: 20),
                 stagger(_AccountActions(signedIn: signedIn)),
               ],
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _GuestModeLine extends StatelessWidget {
+  const _GuestModeLine({this.name});
+
+  final String? name;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (name != null)
+            Text(
+              name!,
+              style: AppText.headlineSm,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          const Row(
+            children: [
+              PulseDot(color: AppColors.mint, size: 8),
+              SizedBox(width: 8),
+              Flexible(
+                child: Text(
+                  'โหมดผู้เยี่ยมชม (Guest Mode)',
+                  style: AppText.monoLabel,
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -660,45 +777,139 @@ class _SettingsCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final unit = context.watch<UnitsCubit>().state;
+    final reminders = context.watch<RemindersCubit>();
+    final settings = reminders.state.settings;
+    final lead = settings.workoutLeadMinutes;
+    final units = context.units;
     return GlassCard(
       radius: 28,
-      padding: const EdgeInsets.fromLTRB(16, 18, 16, 16),
+      padding: const EdgeInsets.fromLTRB(16, 18, 16, 8),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           const SectionHeader('การตั้งค่า', icon: Icons.settings_outlined),
-          const SizedBox(height: 14),
-          Row(
-            children: [
-              const Icon(
-                Icons.straighten_rounded,
-                color: AppColors.textSecondary,
+          const SizedBox(height: 6),
+          _SettingRow(
+            icon: Icons.straighten_rounded,
+            title: 'หน่วยวัดระยะทาง',
+            subtitle: 'กิโลเมตร (กม.) หรือ ไมล์ (mi) ใช้ทั้งแอป',
+            trailing: SizedBox(
+              width: 132,
+              child: PillTabs<DistanceUnit>(
+                items: DistanceUnit.values,
+                selected: unit,
+                height: 36,
+                onChanged: context.read<UnitsCubit>().set,
+                labelOf: (u) => u.short,
               ),
-              const SizedBox(width: 12),
-              const Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('หน่วยวัดระยะทาง', style: AppText.bodyLg),
-                    Text(
-                      'กิโลเมตร (กม.) หรือ ไมล์ (mi) ใช้ทั้งแอป',
-                      style: AppText.caption,
-                    ),
-                  ],
-                ),
-              ),
-              SizedBox(
-                width: 132,
-                child: PillTabs<DistanceUnit>(
-                  items: DistanceUnit.values,
-                  selected: unit,
-                  height: 36,
-                  onChanged: context.read<UnitsCubit>().set,
-                  labelOf: (u) => u.short,
-                ),
-              ),
-            ],
+            ),
           ),
+          _SettingRow(
+            icon: Icons.volume_up_outlined,
+            title: 'เสียงบอกเพซ (Audio Cues)',
+            subtitle:
+                'บอกระยะ เวลา และเพซทุก 1 ${units.unit.long} ระหว่างบันทึก',
+            trailing: Switch(
+              value: settings.audioCues,
+              onChanged: reminders.setAudioCues,
+            ),
+          ),
+          _SettingRow(
+            icon: Icons.notifications_active_outlined,
+            title: 'แจ้งเตือนก่อนซ้อมตามแผน',
+            subtitle: lead == null
+                ? 'ปิดอยู่'
+                : 'ก่อนเวลาเริ่มแต่ละเซสชัน ${_lead(lead)}',
+            trailing: Switch(
+              value: lead != null,
+              onChanged: (on) => reminders.setWorkoutLead(on ? 30 : null),
+            ),
+          ),
+          if (lead != null)
+            Padding(
+              padding: const EdgeInsets.only(left: 36, bottom: 8),
+              child: Wrap(
+                spacing: 8,
+                children: [
+                  for (final m in ReminderSettings.leadChoices)
+                    ChoiceChip(
+                      label: Text(_lead(m)),
+                      selected: lead == m,
+                      onSelected: (_) => reminders.setWorkoutLead(m),
+                    ),
+                ],
+              ),
+            ),
+          _SettingRow(
+            icon: Icons.emoji_events_outlined,
+            title: 'แจ้งเมื่อบรรลุเป้ารายสัปดาห์',
+            subtitle:
+                'เป้า ${units.distance(kWeeklyGoalMeters)} '
+                '${units.distanceUnit} ต่อสัปดาห์',
+            trailing: Switch(
+              value: settings.weeklyGoal,
+              onChanged: reminders.setWeeklyGoal,
+            ),
+          ),
+          _SettingRow(
+            icon: Icons.wb_sunny_outlined,
+            title: 'แจ้งอากาศตอนเช้า 06:00 น.',
+            subtitle: 'พยากรณ์จากจุดเริ่มวิ่งล่าสุด (Open-Meteo)',
+            trailing: Switch(
+              value: settings.morningWeather,
+              onChanged: reminders.setMorningWeather,
+            ),
+          ),
+          if (reminders.state.permissionDenied)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: Text(
+                'การแจ้งเตือนถูกปิดอยู่ในการตั้งค่าเครื่อง เปิดได้ที่ '
+                'การตั้งค่า > Prachaya Run > การแจ้งเตือน',
+                style: AppText.caption.copyWith(color: AppColors.negative),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  static String _lead(int minutes) =>
+      minutes % 60 == 0 ? '${minutes ~/ 60} ชม.' : '$minutes นาที';
+}
+
+class _SettingRow extends StatelessWidget {
+  const _SettingRow({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.trailing,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final Widget trailing;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Row(
+        children: [
+          Icon(icon, color: AppColors.textSecondary),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: AppText.bodyLg),
+                Text(subtitle, style: AppText.caption),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          trailing,
         ],
       ),
     );

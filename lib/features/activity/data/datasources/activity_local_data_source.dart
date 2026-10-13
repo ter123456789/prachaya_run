@@ -4,6 +4,7 @@ import '../../domain/entities/activity.dart';
 import '../models/activity_row_mapper.dart';
 import '../models/remote_activity_summary.dart';
 import 'app_database.dart';
+import '../../../../core/sync/device_owner.dart';
 
 /// Sync bookkeeping of one local activity row.
 class LocalSyncState {
@@ -148,6 +149,19 @@ class ActivityLocalDataSource {
     );
     return rows.first['n']! as int;
   }
+
+  /// Keeps activities recorded signed out on this device only, hidden from
+  /// every account ([restoreDeviceOnly] undoes it).
+  Future<void> parkUnowned() => _db.update(_activities, {
+    'owner_id': kDeviceOnlyOwner,
+  }, where: 'owner_id IS NULL');
+
+  Future<void> restoreDeviceOnly() => _db.update(
+    _activities,
+    {'owner_id': null},
+    where: 'owner_id = ?',
+    whereArgs: [kDeviceOnlyOwner],
+  );
 
   /// Gives activities recorded while signed out to [ownerId].
   Future<void> claimUnowned(String ownerId) =>

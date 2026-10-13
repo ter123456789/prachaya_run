@@ -14,6 +14,7 @@ import '../../../athlete/presentation/bloc/units_cubit.dart';
 import '../../../athlete/presentation/units.dart';
 import '../../domain/entities/planned_workout.dart';
 import '../../domain/services/workout_plan.dart';
+import '../../../reminders/presentation/bloc/reminders_cubit.dart';
 import '../bloc/training_cubit.dart';
 import '../bloc/workout_draft_cubit.dart';
 import '../training_labels.dart';
@@ -31,6 +32,7 @@ class WorkoutSheet extends StatelessWidget {
   }) {
     final training = context.read<TrainingCubit>();
     final units = context.read<UnitsCubit>();
+    final reminders = context.read<RemindersCubit>();
     return showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -39,6 +41,7 @@ class WorkoutSheet extends StatelessWidget {
         providers: [
           BlocProvider.value(value: training),
           BlocProvider.value(value: units),
+          BlocProvider.value(value: reminders),
           BlocProvider(
             create: (_) => WorkoutDraftCubit(
               day: day ?? training.state.selectedDay,
@@ -88,6 +91,8 @@ class WorkoutSheet extends StatelessWidget {
                   ),
                   _When(at: draft.workout.scheduledAt),
                   if (!draft.workout.isRest) ...[
+                    const SizedBox(height: 10),
+                    const _ReminderRow(),
                     const SizedBox(height: 20),
                     const _Label(
                       'เป้าหมายระยะทาง & เพซ (TARGET BENTO)',
@@ -517,6 +522,57 @@ class _When extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+/// Stitch 10 "แจ้งเตือนก่อนวิ่ง": the device-wide reminder setting, so it
+/// applies to every plan on this device.
+class _ReminderRow extends StatelessWidget {
+  const _ReminderRow();
+
+  @override
+  Widget build(BuildContext context) {
+    final reminders = context.watch<RemindersCubit>();
+    final lead = reminders.state.settings.workoutLeadMinutes;
+    return Container(
+      padding: const EdgeInsets.fromLTRB(14, 6, 8, 6),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceLow,
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            lead == null
+                ? Icons.notifications_off_outlined
+                : Icons.notifications_active_outlined,
+            color: lead == null ? AppColors.textMuted : AppColors.lime,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  lead == null
+                      ? 'แจ้งเตือนก่อนวิ่ง (ปิดอยู่)'
+                      : 'แจ้งเตือนก่อนวิ่ง $lead นาที',
+                  style: AppText.bodyLg,
+                ),
+                const Text(
+                  'ใช้กับทุกแผนในเครื่องนี้ ปรับได้ที่ข้อมูลผู้ใช้',
+                  style: AppText.caption,
+                ),
+              ],
+            ),
+          ),
+          Switch(
+            value: lead != null,
+            onChanged: (on) => reminders.setWorkoutLead(on ? 30 : null),
+          ),
+        ],
+      ),
     );
   }
 }

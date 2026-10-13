@@ -1,5 +1,8 @@
 import 'activity.dart';
 
+/// Weekly distance goal (dashboard ring, weekly-goal reminder). Fixed for now.
+const double kWeeklyGoalMeters = 20000;
+
 /// Totals for the calendar week (Monday start) containing a given day,
 /// compared with the week before.
 class WeeklyStats {

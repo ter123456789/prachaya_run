@@ -63,4 +63,23 @@ void main() {
     expect(activity.distanceMeters, closeTo(session.distanceMeters, 1e-9));
     expect(activity.movingTime, const Duration(minutes: 1));
   });
+
+  test('laps mark distance and moving time; not while paused', () {
+    final session = newSession()
+      ..addPoint(pointAt(0))
+      ..addPoint(pointAt(2));
+    expect(session.lapNumber, 1);
+    expect(session.lap(t0.add(const Duration(minutes: 1))), isTrue);
+    expect(session.lapNumber, 2);
+    expect(session.laps.single.distanceMeters, closeTo(222.4, 0.5));
+    expect(session.laps.single.movingTime, const Duration(minutes: 1));
+
+    // Nothing covered since the last lap: ignored.
+    expect(session.lap(t0.add(const Duration(minutes: 2))), isFalse);
+
+    session.pause(t0.add(const Duration(minutes: 2)));
+    session.addPoint(pointAt(4));
+    expect(session.lap(t0.add(const Duration(minutes: 3))), isFalse);
+    expect(session.lapNumber, 2);
+  });
 }

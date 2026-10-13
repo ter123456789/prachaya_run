@@ -19,6 +19,8 @@ import '../../../activity/presentation/bloc/record/record_bloc.dart';
 import '../../../activity/presentation/pages/activity_detail_page.dart';
 import '../../../activity/presentation/pages/record_page.dart';
 import '../../../athlete/presentation/units.dart';
+import '../../../auth/presentation/bloc/auth_cubit.dart';
+import '../../../auth/presentation/widgets/guest_widgets.dart';
 import '../../domain/entities/planned_workout.dart';
 import '../../domain/services/workout_plan.dart';
 import '../bloc/training_cubit.dart';
@@ -28,17 +30,28 @@ import '../widgets/workout_sheet.dart';
 /// Stitch 09 "กำหนดการวิ่ง & ตารางซ้อม": the week strip, the chosen day's
 /// session, current weather, this week's progress and what comes next.
 ///
-/// Left out on purpose: multi-week plan names (e.g. "Half-Marathon Sub 2"),
-/// best-time windows and run reminders — the app has no data for them.
+/// Left out on purpose: multi-week plan names (e.g. "Half-Marathon Sub 2")
+/// and best-time windows — the app has no data for them.
+///
+/// Signed out (Stitch 09 guest) the planner works the same; a pass card at
+/// the end invites to sign up so the plans sync across devices.
 class SchedulePage extends StatelessWidget {
   const SchedulePage({super.key});
 
-  static Route<void> route() =>
-      MaterialPageRoute(builder: (_) => const SchedulePage());
+  /// [day] opens on that day (a reminder was tapped).
+  static Route<void> route({DateTime? day}) => MaterialPageRoute(
+    builder: (context) {
+      if (day != null) context.read<TrainingCubit>().selectDay(day);
+      return const SchedulePage();
+    },
+  );
 
   @override
   Widget build(BuildContext context) {
     final state = context.watch<TrainingCubit>().state;
+    final signedOut = context.select(
+      (AuthCubit c) => c.state.status == AuthStatus.signedOut,
+    );
     final weather = context.select((DashboardCubit c) => c.state.weather);
     var i = 0;
     Widget stagger(Widget child) => FadeSlideIn(
@@ -100,6 +113,10 @@ class SchedulePage extends StatelessWidget {
                 else
                   for (final w in state.upcoming)
                     stagger(_UpcomingTile(w, done: state.isDone(w))),
+                if (signedOut) ...[
+                  const SizedBox(height: 24),
+                  stagger(const SchedulePassCard()),
+                ],
               ],
             ),
           ),

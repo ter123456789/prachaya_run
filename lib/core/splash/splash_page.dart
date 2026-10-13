@@ -187,28 +187,25 @@ class _SplashPageState extends State<SplashPage>
   }
 }
 
+/// The Stitch "Modern Luxury Kinetic" logo (squircle, monogram, wordmark).
 class _AppIcon extends StatelessWidget {
   const _AppIcon();
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 120,
-      height: 120,
+      width: 148,
+      height: 148,
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(32),
-        border: Border.all(color: AppColors.lime, width: 2),
+        borderRadius: BorderRadius.circular(36),
         boxShadow: [
           BoxShadow(
-            color: AppColors.lime.withValues(alpha: 0.35),
-            blurRadius: 32,
+            color: AppColors.lime.withValues(alpha: 0.28),
+            blurRadius: 36,
           ),
         ],
       ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(30),
-        child: Image.asset('assets/icon/app_icon.png', fit: BoxFit.cover),
-      ),
+      child: Image.asset('assets/icon/logo.png', fit: BoxFit.contain),
     );
   }
 }

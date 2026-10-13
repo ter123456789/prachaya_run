@@ -344,6 +344,49 @@ class _Timer extends StatelessWidget {
               ),
             ],
           ),
+          if (state.isActive) _LapLine(state),
+        ],
+      ),
+    );
+  }
+}
+
+/// The lap under way and the button that ends it.
+class _LapLine extends StatelessWidget {
+  const _LapLine(this.state);
+
+  final RecordState state;
+
+  @override
+  Widget build(BuildContext context) {
+    final units = context.units;
+    final recording = state.status == RecordStatus.recording;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 6, 8, 0),
+      child: Row(
+        children: [
+          const PulseDot(color: AppColors.mint, size: 7),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              'รอบที่ ${state.lapNumber} • '
+              '${units.distance(state.lapDistanceMeters)} ${units.distanceUnit} • '
+              '${formatDuration(state.lapTime)}',
+              style: AppText.monoLabel,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          TextButton.icon(
+            onPressed: recording
+                ? () {
+                    HapticFeedback.selectionClick();
+                    context.read<RecordBloc>().add(const RecordLapped());
+                  }
+                : null,
+            icon: const Icon(Icons.flag_outlined, size: 18),
+            label: const Text('เพิ่ม Lap'),
+          ),
         ],
       ),
     );

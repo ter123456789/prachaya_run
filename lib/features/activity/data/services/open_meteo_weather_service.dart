@@ -65,12 +65,41 @@ class OpenMeteoWeatherService implements WeatherService {
     final cached = await _kv.read(key);
     if (cached != null) return _fromCache(cached);
 
-    final day = hour.toIso8601String().substring(0, 10);
     final recent = DateTime.now().toUtc().difference(hour).inDays < 80;
+    final report = await _hourly(lat, lng, hour, archive: !recent);
+    if (report == null) return null;
+    await _kv.write(key, _toCache(report));
+    return report;
+  }
+
+  @override
+  Future<WeatherReport?> forecast({
+    required double lat,
+    required double lng,
+    required DateTime time,
+  }) {
+    final utc = time.toUtc();
+    // Forecasts change: fetched fresh every time, never cached.
+    return _hourly(
+      lat,
+      lng,
+      DateTime.utc(utc.year, utc.month, utc.day, utc.hour),
+      archive: false,
+    );
+  }
+
+  /// The hourly values at [hour] (UTC, whole hour).
+  Future<WeatherReport?> _hourly(
+    double lat,
+    double lng,
+    DateTime hour, {
+    required bool archive,
+  }) async {
+    final day = hour.toIso8601String().substring(0, 10);
     final json = await _get(
       Uri.https(
-        recent ? 'api.open-meteo.com' : 'archive-api.open-meteo.com',
-        recent ? '/v1/forecast' : '/v1/archive',
+        archive ? 'archive-api.open-meteo.com' : 'api.open-meteo.com',
+        archive ? '/v1/archive' : '/v1/forecast',
         {
           'latitude': '$lat',
           'longitude': '$lng',
@@ -90,14 +119,12 @@ class OpenMeteoWeatherService implements WeatherService {
     if (i < 0) return null;
     Object? v(String name) => (hourly[name] as List<Object?>?)?[i];
     if (v('temperature_2m') == null) return null;
-    final report = _report(
+    return _report(
       v('temperature_2m'),
       v('weather_code'),
       v('wind_speed_10m'),
       v('is_day'),
     );
-    await _kv.write(key, _toCache(report));
-    return report;
   }
 
   Future<Map<String, Object?>?> _get(Uri url) async {

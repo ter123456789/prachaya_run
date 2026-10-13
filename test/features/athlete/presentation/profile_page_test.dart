@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:prachaya_run/core/units/distance_unit.dart';
 import 'package:prachaya_run/features/athlete/domain/services/heart_rate_zones.dart';
+import 'package:prachaya_run/features/activity/presentation/pages/activity_detail_page.dart';
+import 'package:prachaya_run/features/athlete/presentation/pages/profile_page.dart';
 
 import '../../../helpers/fakes.dart';
 import '../../../helpers/pump_app.dart';
@@ -21,11 +23,17 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  Future<void> scrollTo(WidgetTester tester, Finder f) async {
+  Future<void> scrollTo(
+    WidgetTester tester,
+    Finder f, {
+    Type page = ProfilePage,
+  }) async {
     await tester.scrollUntilVisible(
       f,
       300,
-      scrollable: find.byType(Scrollable).first,
+      scrollable: find
+          .descendant(of: find.byType(page), matching: find.byType(Scrollable))
+          .first,
     );
     // Built may still mean partly below the edge: bring it fully in view.
     await tester.ensureVisible(f);
@@ -37,15 +45,27 @@ void main() {
     await app.pump(tester);
     await openProfile(tester);
 
-    expect(find.text('นักวิ่ง Prachaya'), findsOneWidget);
-    expect(find.text('ใช้งานในเครื่อง • ยังไม่มีบัญชี'), findsOneWidget);
-    expect(find.text('เก็บข้อมูลในเครื่อง'), findsOneWidget);
-    // No design sample values.
+    // 08 guest: Local Only and an invitation, nothing locked.
+    expect(find.text('โหมดผู้เยี่ยมชม (Guest Mode)'), findsOneWidget);
+    expect(find.text('LOCAL ONLY'), findsOneWidget);
+    expect(find.text('เข้าสู่ระบบเพื่อสำรองและซิงก์ข้อมูล'), findsOneWidget);
+    expect(find.text('ยังไม่มีกิจกรรม'), findsOneWidget);
+    // No design sample values or features without a data source.
     expect(find.text('64.5'), findsNothing);
     expect(find.text('Resting HR'), findsNothing);
-    expect(find.text('VO2 Max'), findsNothing);
+    expect(find.textContaining('VO2 Max'), findsNothing);
+    expect(find.textContaining('Strava'), findsNothing);
+    expect(find.textContaining('+18.4%'), findsNothing);
     await scrollTo(tester, find.text('กรอกข้อมูลร่างกาย'));
     await scrollTo(tester, find.textContaining('ยังไม่มีรองเท้า'));
+
+    // "Why an account?" jumps to the benefits.
+    await tester.drag(find.byType(Scrollable).first, const Offset(0, 4000));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('ทำไมต้องมีบัญชี? (ดูสิทธิประโยชน์)'));
+    await tester.pumpAndSettle();
+    expect(find.text('ซิงก์ข้อมูลข้ามเครื่อง'), findsOneWidget);
+    expect(find.text('สิทธิประโยชน์เมื่อมีบัญชี'), findsOneWidget);
   });
 
   testWidgets('editing the profile updates BMI and zones at once', (
@@ -70,8 +90,8 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(app.profile.profile.birthYear, 2002);
-    expect(find.text('ปราชญา'), findsOneWidget);
-    expect(find.text('BMI 21.1 • สมส่วน'), findsOneWidget);
+    expect(find.textContaining('ปราชญา'), findsOneWidget);
+    await scrollTo(tester, find.text('BMI 21.1 • สมส่วน'));
     expect(find.text('$max'), findsOneWidget);
     expect(find.text('เกณฑ์ Tanaka Method'), findsOneWidget);
     final z1 = heartRateZones(max).first;
@@ -132,7 +152,11 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('วิ่งตอนเช้า'));
     await tester.pumpAndSettle();
-    await scrollTo(tester, find.text('รองเท้าที่ใช้'));
+    await scrollTo(
+      tester,
+      find.text('รองเท้าที่ใช้'),
+      page: ActivityDetailPage,
+    );
     await tester.tap(find.text('รองเท้าที่ใช้'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Pegasus 41').last);
@@ -153,6 +177,9 @@ void main() {
     await tester.pumpAndSettle();
     expect(app.settings.unit, DistanceUnit.mi);
     final mi = (run.distanceMeters / 1609.344).toStringAsFixed(1);
+    // The shoe card is above the settings: start again from the top.
+    await tester.drag(find.byType(Scrollable).first, const Offset(0, 4000));
+    await tester.pumpAndSettle();
     await scrollTo(tester, find.text('$mi ไมล์'));
     await back(tester);
     await tester.pumpAndSettle();
@@ -172,5 +199,47 @@ void main() {
       find.text((run.distanceMeters / 1000).toStringAsFixed(1)),
       findsWidgets,
     );
+  });
+
+  testWidgets('reminder and voice settings are device settings', (
+    tester,
+  ) async {
+    final app = TestApp();
+    await app.pump(tester);
+    await openProfile(tester);
+
+    Finder switchOf(String title) => find.descendant(
+      of: find.ancestor(of: find.text(title), matching: find.byType(Row)).first,
+      matching: find.byType(Switch),
+    );
+
+    await scrollTo(tester, find.text('แจ้งอากาศตอนเช้า 06:00 น.'));
+    await tester.tap(switchOf('แจ้งอากาศตอนเช้า 06:00 น.'));
+    await tester.pumpAndSettle();
+    expect(app.reminderSettings.settings.morningWeather, isTrue);
+    expect(app.reminders.permissionRequests, greaterThan(0));
+
+    await scrollTo(tester, find.text('1 ชม.'));
+    await tester.tap(find.text('1 ชม.'));
+    await tester.pumpAndSettle();
+    expect(app.reminderSettings.settings.workoutLeadMinutes, 60);
+
+    await tester.drag(find.byType(Scrollable).first, const Offset(0, 300));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(switchOf('เสียงบอกเพซ (Audio Cues)'));
+    await tester.pumpAndSettle();
+    await tester.tap(switchOf('เสียงบอกเพซ (Audio Cues)'));
+    await tester.pumpAndSettle();
+    expect(app.reminderSettings.settings.audioCues, isFalse);
+
+    // Denied in the OS: the card says where to turn it on.
+    app.reminders.allow = false;
+    await tester.ensureVisible(switchOf('แจ้งเมื่อบรรลุเป้ารายสัปดาห์'));
+    await tester.pumpAndSettle();
+    await tester.tap(switchOf('แจ้งเมื่อบรรลุเป้ารายสัปดาห์'));
+    await tester.pumpAndSettle();
+    await tester.tap(switchOf('แจ้งเมื่อบรรลุเป้ารายสัปดาห์'));
+    await tester.pumpAndSettle();
+    await scrollTo(tester, find.textContaining('การแจ้งเตือนถูกปิดอยู่'));
   });
 }

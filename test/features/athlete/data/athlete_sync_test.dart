@@ -153,6 +153,7 @@ void main() {
       expect(server.requests, isEmpty);
 
       tokens.session = _session;
+      await engine.claimGuestData('u1');
       expect(await engine.sync(), SyncOutcome.synced);
       expect(server.live('shoes').single['name'], 'Pegasus');
       final w = server.live('workouts').single;
@@ -366,6 +367,7 @@ void main() {
       final shown = await profile.load();
       expect(shown.heightCm, 175);
 
+      await engine.claimGuestData('u1');
       await engine.sync();
       expect(server.profile['heightCm'], 175);
       expect(server.profile['birthYear'], 2002);

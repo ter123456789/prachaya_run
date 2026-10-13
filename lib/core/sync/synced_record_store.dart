@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:sqflite/sqflite.dart';
+import 'device_owner.dart';
 
 typedef Json = Map<String, Object?>;
 
@@ -113,6 +114,18 @@ class SyncedRecordStore {
     },
     where: 'id = ?',
     whereArgs: [id],
+  );
+
+  /// See ActivityLocalDataSource.parkUnowned.
+  Future<void> parkUnowned() => _db.update(table, {
+    'owner_id': kDeviceOnlyOwner,
+  }, where: 'owner_id IS NULL');
+
+  Future<void> restoreDeviceOnly() => _db.update(
+    table,
+    {'owner_id': null},
+    where: 'owner_id = ?',
+    whereArgs: [kDeviceOnlyOwner],
   );
 
   Future<void> claimUnowned(String ownerId) =>

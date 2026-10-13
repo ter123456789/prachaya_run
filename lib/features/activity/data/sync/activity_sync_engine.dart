@@ -68,6 +68,17 @@ class ActivitySyncEngine implements ActivitySync {
     return count;
   }
 
+  /// Gives everything recorded on this device while signed out to [userId]
+  /// (activities, photos, then each participant's data). Sync never does
+  /// this on its own: the user chooses on sign-in (GuestDataRepository).
+  Future<void> claimGuestData(String userId) async {
+    await _local.claimUnowned(userId);
+    await _photos.claimUnowned(userId);
+    for (final p in _participants) {
+      await p.claimUnowned(userId);
+    }
+  }
+
   /// Fire-and-forget sync after a local save or delete.
   void schedule() => unawaited(sync());
 
@@ -104,11 +115,6 @@ class ActivitySyncEngine implements ActivitySync {
     var changed = false;
     void mark(bool c) => changed |= c;
     try {
-      await _local.claimUnowned(session.userId);
-      await _photos.claimUnowned(session.userId);
-      for (final p in _participants) {
-        await p.claimUnowned(session.userId);
-      }
       await _push(session.userId, mark);
       await _pull(session.userId, mark);
       final photosSynced = await _syncPhotos(session.userId, mark);
