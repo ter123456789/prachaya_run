@@ -46,3 +46,6 @@ app.*.map.json
 
 # Local-only files (screenshots for design, etc.)
 /private/
+
+# Build-time --dart-define values (may hold client ids / secrets)
+dart_defines*.json
