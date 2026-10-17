@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/formatters.dart';
+import '../../../../core/layout/content_width.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_text.dart';
 import '../../../../core/widgets/app_top_bar.dart';
@@ -60,9 +61,9 @@ class DashboardPage extends StatelessWidget {
                 color: AppColors.onLime,
                 backgroundColor: AppColors.lime,
                 onRefresh: context.syncActivities,
-                child: ListView(
-                  padding: const EdgeInsets.fromLTRB(16, 4, 16, 140),
-                  children: [
+                child: AdaptiveColumns(
+                  bottom: 140,
+                  header: [
                     AppTopBar(
                       title: 'หน้าหลัก',
                       actions: [
@@ -77,6 +78,8 @@ class DashboardPage extends StatelessWidget {
                     FadeSlideIn(child: _Greeting(now: now)),
                     _RecordingBanner(onTap: onStart),
                     const SizedBox(height: 24),
+                  ],
+                  start: [
                     FadeSlideIn(
                       delay: const Duration(milliseconds: 80),
                       child: SectionHeader(
@@ -106,7 +109,8 @@ class DashboardPage extends StatelessWidget {
                               ),
                             ),
                     ),
-                    const SizedBox(height: 28),
+                  ],
+                  end: [
                     FadeSlideIn(
                       delay: const Duration(milliseconds: 200),
                       child: SectionHeader(

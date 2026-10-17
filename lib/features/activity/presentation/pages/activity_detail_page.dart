@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/formatters.dart';
+import '../../../../core/layout/content_width.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_text.dart';
 import '../../../../core/widgets/app_top_bar.dart';
@@ -90,28 +91,30 @@ class _Loading extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
-      children: [
-        AppTopBar(
-          title: 'รายละเอียดกิจกรรม',
-          onBack: () => Navigator.of(context).maybePop(),
-        ),
-        const SizedBox(height: 16),
-        const Shimmer(height: 300, radius: 28),
-        const SizedBox(height: 20),
-        const Shimmer(height: 28, width: 200),
-        const SizedBox(height: 16),
-        const Row(
-          children: [
-            Expanded(child: Shimmer(height: 110, radius: 20)),
-            SizedBox(width: 12),
-            Expanded(child: Shimmer(height: 110, radius: 20)),
-            SizedBox(width: 12),
-            Expanded(child: Shimmer(height: 110, radius: 20)),
-          ],
-        ),
-      ],
+    return ContentWidth(
+      builder: (context, gutters) => ListView(
+        padding: gutters.copyWith(top: 4),
+        children: [
+          AppTopBar(
+            title: 'รายละเอียดกิจกรรม',
+            onBack: () => Navigator.of(context).maybePop(),
+          ),
+          const SizedBox(height: 16),
+          const Shimmer(height: 300, radius: 28),
+          const SizedBox(height: 20),
+          const Shimmer(height: 28, width: 200),
+          const SizedBox(height: 16),
+          const Row(
+            children: [
+              Expanded(child: Shimmer(height: 110, radius: 20)),
+              SizedBox(width: 12),
+              Expanded(child: Shimmer(height: 110, radius: 20)),
+              SizedBox(width: 12),
+              Expanded(child: Shimmer(height: 110, radius: 20)),
+            ],
+          ),
+        ],
+      ),
     );
   }
 }
@@ -123,18 +126,20 @@ class _Message extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
-      child: Column(
-        children: [
-          AppTopBar(
-            title: 'รายละเอียดกิจกรรม',
-            onBack: () => Navigator.of(context).maybePop(),
-          ),
-          Expanded(
-            child: Center(child: Text(text, style: AppText.body)),
-          ),
-        ],
+    return MaxWidth(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+        child: Column(
+          children: [
+            AppTopBar(
+              title: 'รายละเอียดกิจกรรม',
+              onBack: () => Navigator.of(context).maybePop(),
+            ),
+            Expanded(
+              child: Center(child: Text(text, style: AppText.body)),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -158,9 +163,9 @@ class _Body extends StatelessWidget {
       delay: Duration(milliseconds: 60 * (i++).clamp(0, 8)),
       child: child,
     );
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 4, 16, 40),
-      children: [
+    return AdaptiveColumns(
+      gap: 16,
+      header: [
         AppTopBar(
           title: 'รายละเอียดกิจกรรม',
           onBack: () => Navigator.of(context).maybePop(),
@@ -196,12 +201,15 @@ class _Body extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 14),
+      ],
+      start: [
         stagger(_MapCard(activity: activity, insights: insights)),
         const SizedBox(height: 20),
         stagger(_TitleBlock(activity: activity, weather: state.weather)),
         const SizedBox(height: 16),
         stagger(_StatBento(activity: activity, insights: insights)),
-        const SizedBox(height: 16),
+      ],
+      end: [
         stagger(
           FilledButton.icon(
             onPressed: () =>

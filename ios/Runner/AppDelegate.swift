@@ -3,19 +3,22 @@ import UIKit
 import UserNotifications
 
 @main
-@objc class AppDelegate: FlutterAppDelegate {
+@objc class AppDelegate: FlutterAppDelegate, FlutterImplicitEngineDelegate {
   private var liveActivity: LiveActivityBridge?
 
   override func application(
     _ application: UIApplication,
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
   ) -> Bool {
-    GeneratedPluginRegistrant.register(with: self)
     // Reminders show while the app is open too (flutter_local_notifications).
     UNUserNotificationCenter.current().delegate = self as UNUserNotificationCenterDelegate
-    if let controller = window?.rootViewController as? FlutterViewController {
-      liveActivity = LiveActivityBridge(messenger: controller.binaryMessenger)
-    }
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
+  }
+
+  // UIScene lifecycle (required by the iOS 27 SDK): the engine is created by
+  // FlutterSceneDelegate after launch, so plugins and channels attach here.
+  func didInitializeImplicitFlutterEngine(_ engineBridge: FlutterImplicitEngineBridge) {
+    GeneratedPluginRegistrant.register(with: engineBridge.pluginRegistry)
+    liveActivity = LiveActivityBridge(messenger: engineBridge.applicationRegistrar.messenger())
   }
 }

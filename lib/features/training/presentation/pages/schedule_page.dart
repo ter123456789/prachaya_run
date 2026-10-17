@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../../core/layout/content_width.dart';
 import '../../../../core/formatters.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_text.dart';
@@ -64,60 +65,62 @@ class SchedulePage extends StatelessWidget {
         child: SafeArea(
           bottom: false,
           child: EdgeFade(
-            child: ListView(
-              padding: const EdgeInsets.fromLTRB(16, 4, 16, 40),
-              children: [
-                AppTopBar(
-                  title: 'ตารางซ้อม',
-                  onBack: () => Navigator.of(context).maybePop(),
-                ),
-                const SizedBox(height: 8),
-                stagger(const _Title()),
-                const SizedBox(height: 16),
-                stagger(_WeekStrip(state: state)),
-                const SizedBox(height: 16),
-                stagger(_FocusCard(state: state)),
-                if (weather != null) ...[
+            child: ContentWidth(
+              builder: (context, gutters) => ListView(
+                padding: gutters.copyWith(top: 4, bottom: 40),
+                children: [
+                  AppTopBar(
+                    title: 'ตารางซ้อม',
+                    onBack: () => Navigator.of(context).maybePop(),
+                  ),
+                  const SizedBox(height: 8),
+                  stagger(const _Title()),
                   const SizedBox(height: 16),
-                  stagger(_WeatherCard(weather)),
-                ],
-                const SizedBox(height: 16),
-                stagger(_WeekProgress(week: state.week)),
-                const SizedBox(height: 24),
-                stagger(
-                  Row(
-                    children: [
-                      const Expanded(
+                  stagger(_WeekStrip(state: state)),
+                  const SizedBox(height: 16),
+                  stagger(_FocusCard(state: state)),
+                  if (weather != null) ...[
+                    const SizedBox(height: 16),
+                    stagger(_WeatherCard(weather)),
+                  ],
+                  const SizedBox(height: 16),
+                  stagger(_WeekProgress(week: state.week)),
+                  const SizedBox(height: 24),
+                  stagger(
+                    Row(
+                      children: [
+                        const Expanded(
+                          child: Text(
+                            'ตารางที่กำลังจะมาถึง',
+                            style: AppText.headlineSm,
+                          ),
+                        ),
+                        Text(
+                          '${state.upcoming.length} เซสชัน',
+                          style: AppText.monoLabel,
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  if (state.upcoming.isEmpty)
+                    stagger(
+                      const GlassCard(
                         child: Text(
-                          'ตารางที่กำลังจะมาถึง',
-                          style: AppText.headlineSm,
+                          'ยังไม่มีตารางล่วงหน้า กด "เพิ่มตาราง" เพื่อวางแผนวันถัดไป',
+                          style: AppText.body,
                         ),
                       ),
-                      Text(
-                        '${state.upcoming.length} เซสชัน',
-                        style: AppText.monoLabel,
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 10),
-                if (state.upcoming.isEmpty)
-                  stagger(
-                    const GlassCard(
-                      child: Text(
-                        'ยังไม่มีตารางล่วงหน้า กด "เพิ่มตาราง" เพื่อวางแผนวันถัดไป',
-                        style: AppText.body,
-                      ),
-                    ),
-                  )
-                else
-                  for (final w in state.upcoming)
-                    stagger(_UpcomingTile(w, done: state.isDone(w))),
-                if (signedOut) ...[
-                  const SizedBox(height: 24),
-                  stagger(const SchedulePassCard()),
+                    )
+                  else
+                    for (final w in state.upcoming)
+                      stagger(_UpcomingTile(w, done: state.isDone(w))),
+                  if (signedOut) ...[
+                    const SizedBox(height: 24),
+                    stagger(const SchedulePassCard()),
+                  ],
                 ],
-              ],
+              ),
             ),
           ),
         ),

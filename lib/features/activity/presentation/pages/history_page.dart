@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../../core/layout/content_width.dart';
 import '../../../../core/formatters.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_text.dart';
@@ -42,54 +43,56 @@ class HistoryPage extends StatelessWidget {
         child: BlocBuilder<HistoryCubit, HistoryState>(
           builder: (context, state) {
             final months = MonthlySummary.group(state.visible);
-            return Column(
-              children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
-                  child: AppTopBar(
-                    title: 'ประวัติกิจกรรม',
-                    actions: [
-                      AvatarButton(
-                        signedIn: signedIn,
-                        onPressed: () =>
-                            Navigator.of(context).push(AccountPage.route()),
-                      ),
-                    ],
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-                  child: PillTabs<ActivityType?>(
-                    items: const [null, ...ActivityType.values],
-                    selected: state.filter,
-                    labelOf: (t) => t?.label ?? 'ทั้งหมด',
-                    iconOf: (t) => t?.icon ?? Icons.apps_rounded,
-                    onChanged: context.read<HistoryCubit>().setFilter,
-                  ),
-                ),
-                Expanded(
-                  child: EdgeFade(
-                    child: AnimatedSwitcher(
-                      duration: const Duration(milliseconds: 320),
-                      switchInCurve: Curves.easeOutCubic,
-                      transitionBuilder: (child, a) => FadeTransition(
-                        opacity: a,
-                        child: SlideTransition(
-                          position: Tween(
-                            begin: const Offset(0, 0.03),
-                            end: Offset.zero,
-                          ).animate(a),
-                          child: child,
+            return ContentWidth(
+              builder: (context, gutters) => Column(
+                children: [
+                  Padding(
+                    padding: gutters.copyWith(top: 4),
+                    child: AppTopBar(
+                      title: 'ประวัติกิจกรรม',
+                      actions: [
+                        AvatarButton(
+                          signedIn: signedIn,
+                          onPressed: () =>
+                              Navigator.of(context).push(AccountPage.route()),
                         ),
-                      ),
-                      child: KeyedSubtree(
-                        key: ValueKey((state.filter, state.status)),
-                        child: _body(context, state, months),
+                      ],
+                    ),
+                  ),
+                  Padding(
+                    padding: gutters.copyWith(top: 12, bottom: 8),
+                    child: PillTabs<ActivityType?>(
+                      items: const [null, ...ActivityType.values],
+                      selected: state.filter,
+                      labelOf: (t) => t?.label ?? 'ทั้งหมด',
+                      iconOf: (t) => t?.icon ?? Icons.apps_rounded,
+                      onChanged: context.read<HistoryCubit>().setFilter,
+                    ),
+                  ),
+                  Expanded(
+                    child: EdgeFade(
+                      child: AnimatedSwitcher(
+                        duration: const Duration(milliseconds: 320),
+                        switchInCurve: Curves.easeOutCubic,
+                        transitionBuilder: (child, a) => FadeTransition(
+                          opacity: a,
+                          child: SlideTransition(
+                            position: Tween(
+                              begin: const Offset(0, 0.03),
+                              end: Offset.zero,
+                            ).animate(a),
+                            child: child,
+                          ),
+                        ),
+                        child: KeyedSubtree(
+                          key: ValueKey((state.filter, state.status)),
+                          child: _body(context, state, months, gutters),
+                        ),
                       ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             );
           },
         ),
@@ -101,11 +104,12 @@ class HistoryPage extends StatelessWidget {
     BuildContext context,
     HistoryState state,
     List<MonthlySummary> months,
+    EdgeInsets gutters,
   ) {
     if (months.isEmpty) {
       return switch (state.status) {
         HistoryStatus.loading => ListView(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+          padding: gutters.copyWith(top: 8),
           children: const [
             Shimmer(height: 150, radius: 28),
             SizedBox(height: 14),
@@ -147,7 +151,7 @@ class HistoryPage extends StatelessWidget {
       backgroundColor: AppColors.lime,
       onRefresh: context.syncActivities,
       child: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 150),
+        padding: gutters.copyWith(top: 8, bottom: 150),
         children: [
           for (final month in months) ...[
             FadeSlideIn(

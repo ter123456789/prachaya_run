@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../../core/layout/content_width.dart';
 import '../../../../core/formatters.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_text.dart';
@@ -54,52 +55,59 @@ class _AccountPageState extends State<AccountPage> {
         glowHeight: 240,
         child: SafeArea(
           child: EdgeFade(
-            child: ListView(
-              padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
-              children: [
-                AppTopBar(
-                  title: 'บัญชี',
-                  onBack: () => Navigator.of(context).maybePop(),
-                  actions: [
-                    StatusPill(
-                      text: 'CLOUD ENGINE',
-                      mono: true,
-                      dotColor: status == AuthStatus.signedIn && online
-                          ? AppColors.lime
-                          : AppColors.negative,
-                      pulse: sync.syncing,
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 380),
-                  switchInCurve: Curves.easeOutCubic,
-                  transitionBuilder: (child, a) => FadeTransition(
-                    opacity: a,
-                    child: SlideTransition(
-                      position: Tween(
-                        begin: const Offset(0, 0.04),
-                        end: Offset.zero,
-                      ).animate(a),
-                      child: child,
-                    ),
+            child: ContentWidth(
+              builder: (context, gutters) => ListView(
+                padding: gutters.copyWith(top: 4, bottom: 32),
+                children: [
+                  AppTopBar(
+                    title: 'บัญชี',
+                    onBack: () => Navigator.of(context).maybePop(),
+                    actions: [
+                      StatusPill(
+                        text: 'CLOUD ENGINE',
+                        mono: true,
+                        dotColor: status == AuthStatus.signedIn && online
+                            ? AppColors.lime
+                            : AppColors.negative,
+                        pulse: sync.syncing,
+                      ),
+                    ],
                   ),
-                  child: switch (status) {
-                    AuthStatus.signedIn => const _SignedIn(key: ValueKey('in')),
-                    AuthStatus.signedOut => _SignInForm(
-                      key: const ValueKey('out'),
-                      register: widget.register,
+                  const SizedBox(height: 16),
+                  AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 380),
+                    switchInCurve: Curves.easeOutCubic,
+                    transitionBuilder: (child, a) => FadeTransition(
+                      opacity: a,
+                      child: SlideTransition(
+                        position: Tween(
+                          begin: const Offset(0, 0.04),
+                          end: Offset.zero,
+                        ).animate(a),
+                        child: child,
+                      ),
                     ),
-                    AuthStatus.unknown => const Padding(
-                      padding: EdgeInsets.all(48),
-                      child: Center(child: CircularProgressIndicator()),
-                    ),
-                  },
-                ),
-                const SizedBox(height: 16),
-                _StatusBar(signedIn: status == AuthStatus.signedIn, sync: sync),
-              ],
+                    child: switch (status) {
+                      AuthStatus.signedIn => const _SignedIn(
+                        key: ValueKey('in'),
+                      ),
+                      AuthStatus.signedOut => _SignInForm(
+                        key: const ValueKey('out'),
+                        register: widget.register,
+                      ),
+                      AuthStatus.unknown => const Padding(
+                        padding: EdgeInsets.all(48),
+                        child: Center(child: CircularProgressIndicator()),
+                      ),
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  _StatusBar(
+                    signedIn: status == AuthStatus.signedIn,
+                    sync: sync,
+                  ),
+                ],
+              ),
             ),
           ),
         ),

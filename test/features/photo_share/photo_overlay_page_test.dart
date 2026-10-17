@@ -54,10 +54,15 @@ void main() {
   }
 
   Future<Uint8List> exportPng(WidgetTester tester) async {
+    final before = sink.shared.length;
     await tester.tap(find.text('แชร์'));
-    await tester.runAsync(
-      () => Future<void>.delayed(const Duration(milliseconds: 500)),
-    );
+    // Rasterizing takes real time, longer when the suite runs in parallel.
+    for (var i = 0; i < 50 && sink.shared.length == before; i++) {
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 100)),
+      );
+      await tester.pump();
+    }
     await tester.pumpAndSettle();
     return sink.shared.last;
   }

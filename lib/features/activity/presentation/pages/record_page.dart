@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../../core/layout/content_width.dart';
 import '../../../../core/formatters.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_text.dart';
@@ -44,28 +45,54 @@ class RecordPage extends StatelessWidget {
           body: GlowBackground(
             glowHeight: 220,
             child: SafeArea(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Column(
-                  children: [
-                    const SizedBox(height: 4),
-                    AppTopBar(
-                      title: 'บันทึกกิจกรรม',
-                      onBack: () => Navigator.of(context).maybePop(),
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  // Landscape (foldable inner screen, or any phone turned
+                  // sideways): the track beside the numbers.
+                  final side =
+                      constraints.maxWidth > constraints.maxHeight &&
+                      constraints.maxWidth >= 600;
+                  return MaxWidth(
+                    maxWidth: side
+                        ? Breakpoints.wideContent
+                        : Breakpoints.content,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: Column(
+                        children: [
+                          const SizedBox(height: 4),
+                          AppTopBar(
+                            title: 'บันทึกกิจกรรม',
+                            onBack: () => Navigator.of(context).maybePop(),
+                          ),
+                          const SizedBox(height: 8),
+                          _StatusRow(state),
+                          const SizedBox(height: 12),
+                          if (side)
+                            Expanded(
+                              child: Row(
+                                children: [
+                                  Expanded(child: _TrackPanel(state)),
+                                  const SizedBox(width: Breakpoints.paneGap),
+                                  SizedBox(width: 380, child: _Readouts(state)),
+                                ],
+                              ),
+                            )
+                          else ...[
+                            Expanded(child: _TrackPanel(state)),
+                            const SizedBox(height: 12),
+                            _Timer(state),
+                            const SizedBox(height: 12),
+                            _Tiles(state),
+                            const SizedBox(height: 20),
+                            _Controls(state),
+                          ],
+                          const SizedBox(height: 12),
+                        ],
+                      ),
                     ),
-                    const SizedBox(height: 8),
-                    _StatusRow(state),
-                    const SizedBox(height: 12),
-                    Expanded(child: _TrackPanel(state)),
-                    const SizedBox(height: 12),
-                    _Timer(state),
-                    const SizedBox(height: 12),
-                    _Tiles(state),
-                    const SizedBox(height: 20),
-                    _Controls(state),
-                    const SizedBox(height: 12),
-                  ],
-                ),
+                  );
+                },
               ),
             ),
           ),
@@ -116,6 +143,35 @@ class RecordPage extends StatelessWidget {
   };
 }
 
+/// Timer, tiles and controls as one column beside the track (landscape);
+/// scrolls if the screen is too short for all of it.
+class _Readouts extends StatelessWidget {
+  const _Readouts(this.state);
+
+  final RecordState state;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) => SingleChildScrollView(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(minHeight: constraints.maxHeight),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              _Timer(state),
+              const SizedBox(height: 12),
+              _Tiles(state),
+              const SizedBox(height: 20),
+              _Controls(state),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _StatusRow extends StatelessWidget {
   const _StatusRow(this.state);
 
@@ -151,17 +207,26 @@ class _StatusRow extends StatelessWidget {
         : ('GPS อ่อน', AppColors.negative);
     return Row(
       children: [
-        AnimatedSwitcher(
-          duration: const Duration(milliseconds: 250),
-          child: StatusPill(
-            key: ValueKey(text),
-            text: text,
-            dotColor: color,
-            pulse: state.status == RecordStatus.recording,
-            color: AppColors.textPrimary,
+        // Shrinks instead of overflowing on narrow screens.
+        Expanded(
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 250),
+                child: StatusPill(
+                  key: ValueKey(text),
+                  text: text,
+                  dotColor: color,
+                  pulse: state.status == RecordStatus.recording,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+            ),
           ),
         ),
-        const Spacer(),
+        const SizedBox(width: 8),
         StatusPill(
           text: gps,
           icon: Icons.satellite_alt_rounded,
@@ -274,29 +339,34 @@ class _Waiting extends StatelessWidget {
             ),
           Expanded(
             child: Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    width: 84,
-                    height: 84,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: AppColors.limeSoft,
-                      border: Border.all(color: AppColors.glassBorder),
+              // Shrinks rather than overflows on short screens (foldable
+              // outer screen, landscape).
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 84,
+                      height: 84,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: AppColors.limeSoft,
+                        border: Border.all(color: AppColors.glassBorder),
+                      ),
+                      child: Icon(
+                        idle ? state.type.icon : Icons.gps_not_fixed_rounded,
+                        size: 40,
+                        color: AppColors.lime,
+                      ),
                     ),
-                    child: Icon(
-                      idle ? state.type.icon : Icons.gps_not_fixed_rounded,
-                      size: 40,
-                      color: AppColors.lime,
+                    const SizedBox(height: 12),
+                    Text(
+                      idle ? 'เลือกประเภทแล้วกดเริ่ม' : 'กำลังรอสัญญาณ GPS…',
+                      style: AppText.body,
                     ),
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    idle ? 'เลือกประเภทแล้วกดเริ่ม' : 'กำลังรอสัญญาณ GPS…',
-                    style: AppText.body,
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),

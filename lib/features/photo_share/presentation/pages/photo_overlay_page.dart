@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../../core/layout/content_width.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/widgets/app_chip.dart';
 import '../../../../core/widgets/app_top_bar.dart';
@@ -106,88 +107,118 @@ class _PhotoOverlayPageState extends State<PhotoOverlayPage> {
             glowHeight: 260,
             child: SafeArea(
               bottom: false,
-              child: Column(
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
-                    child: AppTopBar(
-                      title: 'สตูดิโอแชร์รูป',
-                      onBack: () => Navigator.of(context).maybePop(),
-                    ),
-                  ),
-                  Expanded(
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Center(
-                        child: TweenAnimationBuilder<double>(
-                          tween: Tween(end: state.frame.aspectRatio),
-                          duration: const Duration(milliseconds: 380),
-                          curve: Curves.easeOutCubic,
-                          builder: (context, ratio, child) =>
-                              AspectRatio(aspectRatio: ratio, child: child),
-                          child: DecoratedBox(
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(28),
-                              boxShadow: const [
-                                BoxShadow(
-                                  color: Color(0x99000000),
-                                  blurRadius: 40,
-                                  offset: Offset(0, 20),
-                                ),
-                              ],
-                            ),
-                            child: _Preview(
-                              canvasKey: _canvasKey,
-                              state: state,
-                              cubit: cubit,
-                            ),
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final preview = Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Center(
+                      child: TweenAnimationBuilder<double>(
+                        tween: Tween(end: state.frame.aspectRatio),
+                        duration: const Duration(milliseconds: 380),
+                        curve: Curves.easeOutCubic,
+                        builder: (context, ratio, child) =>
+                            AspectRatio(aspectRatio: ratio, child: child),
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(28),
+                            boxShadow: const [
+                              BoxShadow(
+                                color: Color(0x99000000),
+                                blurRadius: 40,
+                                offset: Offset(0, 20),
+                              ),
+                            ],
+                          ),
+                          child: _Preview(
+                            canvasKey: _canvasKey,
+                            state: state,
+                            cubit: cubit,
                           ),
                         ),
                       ),
                     ),
-                  ),
-                  _Options(state: state, cubit: cubit),
-                  SafeArea(
-                    top: false,
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: OutlinedButton.icon(
-                              onPressed: state.isBusy
-                                  ? null
-                                  : () => cubit.save(_render),
-                              icon: const Icon(Icons.download_rounded),
-                              label: const Text('บันทึกรูป'),
-                            ),
+                  );
+                  final controls = Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      _Options(state: state, cubit: cubit),
+                      SafeArea(
+                        top: false,
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: OutlinedButton.icon(
+                                  onPressed: state.isBusy
+                                      ? null
+                                      : () => cubit.save(_render),
+                                  icon: const Icon(Icons.download_rounded),
+                                  label: const Text('บันทึกรูป'),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: FilledButton.icon(
+                                  key: _shareButtonKey,
+                                  onPressed: state.isBusy
+                                      ? null
+                                      : () => cubit.share(
+                                          _render,
+                                          anchor: _shareAnchor(),
+                                        ),
+                                  icon:
+                                      state.status ==
+                                          PhotoOverlayStatus.exporting
+                                      ? const SizedBox.square(
+                                          dimension: 18,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                          ),
+                                        )
+                                      : const Icon(Icons.ios_share_rounded),
+                                  label: const Text('แชร์'),
+                                ),
+                              ),
+                            ],
                           ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: FilledButton.icon(
-                              key: _shareButtonKey,
-                              onPressed: state.isBusy
-                                  ? null
-                                  : () => cubit.share(
-                                      _render,
-                                      anchor: _shareAnchor(),
-                                    ),
-                              icon: state.status == PhotoOverlayStatus.exporting
-                                  ? const SizedBox.square(
-                                      dimension: 18,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                      ),
-                                    )
-                                  : const Icon(Icons.ios_share_rounded),
-                              label: const Text('แชร์'),
-                            ),
-                          ),
-                        ],
+                        ),
                       ),
-                    ),
-                  ),
-                ],
+                    ],
+                  );
+                  // Landscape (foldable inner screen, phone sideways): the
+                  // preview beside the options instead of squeezed above.
+                  final side =
+                      constraints.maxWidth > constraints.maxHeight &&
+                      constraints.maxWidth >= 600;
+                  return Column(
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+                        child: AppTopBar(
+                          title: 'สตูดิโอแชร์รูป',
+                          onBack: () => Navigator.of(context).maybePop(),
+                        ),
+                      ),
+                      if (side)
+                        Expanded(
+                          child: Row(
+                            children: [
+                              Expanded(child: preview),
+                              SizedBox(
+                                width: 420,
+                                child: SingleChildScrollView(child: controls),
+                              ),
+                            ],
+                          ),
+                        )
+                      else ...[
+                        Expanded(child: preview),
+                        MaxWidth(child: controls),
+                      ],
+                    ],
+                  );
+                },
               ),
             ),
           ),

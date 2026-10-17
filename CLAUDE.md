@@ -13,6 +13,7 @@ lib/
     sync/                   # SyncParticipant port, SyncedRecordStore + RecordSyncParticipant
                             #   (generic offline-first records: shoes, planned workouts)
     units/                  # DistanceUnit (km/mi) math + Thai/Latin unit labels
+    layout/                 # Breakpoints, ContentWidth / AdaptiveColumns / MaxWidth (foldables, landscape)
   features/activity/
     domain/                 # PURE DART: entities, ports, use cases
     data/                   # sqflite + geolocator implementations of the ports
@@ -154,6 +155,11 @@ Rules (enforced for every feature by `test/architecture_test.dart`):
   - **Android:** an ongoing notification with the same buttons (`AndroidRecordingNotification`).
   - **Laps:** live only (`RecordingSession.lap`, `RecordLapped`); activities and the API keep no laps.
   Dashboard has a "ตารางซ้อม" teaser below the latest activity → SchedulePage.
+- Responsive (iPhone Duo foldable: outer ≈ 380 pt beside the camera strip, inner 669 × 951 pt):
+  - Pages centre one column ≤ 640 pt (`ContentWidth` gutters keep the scroll view full width).
+  - From 840 pt (inner screen sideways) dashboard and activity detail split into two panes (`AdaptiveColumns`).
+  - Record page and photo studio go side by side in any landscape ≥ 600 pt; the dock caps at 480 pt.
+  - `test/responsive_layout_test.dart` opens every page at the three Duo sizes and fails on overflow.
 - Motion: entrance staggers, count-ups, ring/bar sweeps, sliding tabs, press springs, haptics. Every
   looping animation stops under OS "remove animations" (widget tests run with it on so pumpAndSettle ends).
 - Font files in `assets/fonts/` (OFL). Launch: native splash `#0C0D0B`, then `core/splash/SplashPage`.
@@ -178,6 +184,12 @@ Rules (enforced for every feature by `test/architecture_test.dart`):
   (or a branded opaque card without one), or "พื้นใส" cut-out: only text + route, transparent PNG,
   no shadows or glass tiles; it hides (not deletes) a chosen photo. `_render` precaches the photo first
   so a just-picked image is never exported blank.
+
+## iOS build
+- Xcode 27 / iOS 27 SDK: deployment target ≥ 15.0 (Podfile `post_install` raises every pod), and the
+  UIScene lifecycle is required (`FlutterSceneDelegate` in Info.plist). Plugins and `LiveActivityBridge`
+  attach in `AppDelegate.didInitializeImplicitFlutterEngine`, not `didFinishLaunching`.
+- Simulator GUI is DeviceHub (inside Xcode.app); `flutter run -d <id>` / `xcrun simctl` work without it.
 
 ## Commands
 - `flutter analyze` — must be clean

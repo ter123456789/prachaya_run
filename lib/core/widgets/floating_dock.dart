@@ -35,49 +35,59 @@ class FloatingDock extends StatelessWidget {
 
   static const height = 64.0;
 
+  /// Stays thumb-sized on wide screens (foldables, landscape).
+  static const maxWidth = 480.0;
+
   @override
   Widget build(BuildContext context) {
     return SafeArea(
       top: false,
       minimum: const EdgeInsets.only(bottom: 12),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        child: SizedBox(
-          height: height + 26,
-          child: Stack(
-            alignment: Alignment.bottomCenter,
-            clipBehavior: Clip.none,
-            children: [
-              ClipRRect(
-                borderRadius: BorderRadius.circular(28),
-                child: BackdropFilter(
-                  filter: ImageFilter.blur(sigmaX: 28, sigmaY: 28),
-                  child: Container(
-                    height: height,
-                    decoration: BoxDecoration(
-                      color: const Color(0xCC1B1C1A),
-                      borderRadius: BorderRadius.circular(28),
-                      border: Border.all(color: AppColors.glassBorder),
-                    ),
-                    child: Row(
-                      children: [
-                        Expanded(child: _tab(0)),
-                        const SizedBox(width: 96),
-                        Expanded(child: _tab(1)),
-                      ],
+      child: Center(
+        heightFactor: 1,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: maxWidth),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: SizedBox(
+              width: double.infinity,
+              height: height + 26,
+              child: Stack(
+                alignment: Alignment.bottomCenter,
+                clipBehavior: Clip.none,
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(28),
+                    child: BackdropFilter(
+                      filter: ImageFilter.blur(sigmaX: 28, sigmaY: 28),
+                      child: Container(
+                        height: height,
+                        decoration: BoxDecoration(
+                          color: const Color(0xCC1B1C1A),
+                          borderRadius: BorderRadius.circular(28),
+                          border: Border.all(color: AppColors.glassBorder),
+                        ),
+                        child: Row(
+                          children: [
+                            Expanded(child: _tab(0)),
+                            const SizedBox(width: 96),
+                            Expanded(child: _tab(1)),
+                          ],
+                        ),
+                      ),
                     ),
                   ),
-                ),
+                  Positioned(
+                    top: 0,
+                    child: OrbButton(
+                      onPressed: onOrb,
+                      active: orbActive,
+                      tooltip: orbTooltip,
+                    ),
+                  ),
+                ],
               ),
-              Positioned(
-                top: 0,
-                child: OrbButton(
-                  onPressed: onOrb,
-                  active: orbActive,
-                  tooltip: orbTooltip,
-                ),
-              ),
-            ],
+            ),
           ),
         ),
       ),

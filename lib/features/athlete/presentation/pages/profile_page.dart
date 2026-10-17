@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../../core/layout/content_width.dart';
 import '../../../../core/formatters.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_text.dart';
@@ -114,84 +115,90 @@ class _ProfilePageState extends State<ProfilePage> {
         child: SafeArea(
           bottom: false,
           child: EdgeFade(
-            child: ListView(
-              controller: _scroll,
-              padding: const EdgeInsets.fromLTRB(16, 4, 16, 40),
-              children: [
-                AppTopBar(
-                  title: 'ข้อมูลผู้ใช้',
-                  onBack: () => Navigator.of(context).maybePop(),
-                  actions: [
-                    if (!signedIn) ...[
-                      const StatusPill(
-                        text: 'LOCAL ONLY',
-                        icon: Icons.phonelink_rounded,
-                        mono: true,
-                      ),
-                      const SizedBox(width: 8),
-                      CircleIconButton(
-                        icon: Icons.edit_outlined,
-                        tooltip: 'แก้ไขโปรไฟล์',
-                        size: 40,
-                        onPressed: edit,
-                      ),
+            child: ContentWidth(
+              builder: (context, gutters) => ListView(
+                controller: _scroll,
+                padding: gutters.copyWith(top: 4, bottom: 40),
+                children: [
+                  AppTopBar(
+                    title: 'ข้อมูลผู้ใช้',
+                    onBack: () => Navigator.of(context).maybePop(),
+                    actions: [
+                      if (!signedIn) ...[
+                        const StatusPill(
+                          text: 'LOCAL ONLY',
+                          icon: Icons.phonelink_rounded,
+                          mono: true,
+                        ),
+                        const SizedBox(width: 8),
+                        CircleIconButton(
+                          icon: Icons.edit_outlined,
+                          tooltip: 'แก้ไขโปรไฟล์',
+                          size: 40,
+                          onPressed: edit,
+                        ),
+                      ],
                     ],
-                  ],
-                ),
-                const SizedBox(height: 12),
-                if (signedIn)
-                  stagger(
-                    _Header(profile: profile, signedIn: signedIn, onEdit: edit),
-                  )
-                else ...[
-                  stagger(_GuestModeLine(name: profile.displayName)),
+                  ),
                   const SizedBox(height: 12),
-                  stagger(GuestHeroCard(onWhy: _showBenefits)),
-                  const SizedBox(height: 16),
+                  if (signedIn)
+                    stagger(
+                      _Header(
+                        profile: profile,
+                        signedIn: signedIn,
+                        onEdit: edit,
+                      ),
+                    )
+                  else ...[
+                    stagger(_GuestModeLine(name: profile.displayName)),
+                    const SizedBox(height: 12),
+                    stagger(GuestHeroCard(onWhy: _showBenefits)),
+                    const SizedBox(height: 16),
+                    stagger(
+                      DeviceDataCard(
+                        activityCount: activities.length,
+                        distanceMeters: activities.fold(
+                          0,
+                          (sum, a) => sum + a.distanceMeters,
+                        ),
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 20),
                   stagger(
-                    DeviceDataCard(
-                      activityCount: activities.length,
-                      distanceMeters: activities.fold(
-                        0,
-                        (sum, a) => sum + a.distanceMeters,
+                    const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 4),
+                      child: Text(
+                        'ข้อมูลสรีระ & สภาพร่างกาย',
+                        style: AppText.label,
                       ),
                     ),
                   ),
-                ],
-                const SizedBox(height: 20),
-                stagger(
-                  const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 4),
-                    child: Text(
-                      'ข้อมูลสรีระ & สภาพร่างกาย',
-                      style: AppText.label,
+                  const SizedBox(height: 10),
+                  stagger(
+                    _BodyGrid(
+                      profile: profile,
+                      maxHr: maxHr,
+                      now: now,
+                      onEdit: edit,
                     ),
                   ),
-                ),
-                const SizedBox(height: 10),
-                stagger(
-                  _BodyGrid(
-                    profile: profile,
-                    maxHr: maxHr,
-                    now: now,
-                    onEdit: edit,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                stagger(HeartRateZonesCard(maxHr: maxHr, onSetUp: edit)),
-                const SizedBox(height: 16),
-                stagger(_AllTimeCard(AllTimeStats.from(activities))),
-                const SizedBox(height: 16),
-                stagger(const _GearCard()),
-                const SizedBox(height: 16),
-                stagger(const _SettingsCard()),
-                if (!signedIn) ...[
+                  const SizedBox(height: 16),
+                  stagger(HeartRateZonesCard(maxHr: maxHr, onSetUp: edit)),
+                  const SizedBox(height: 16),
+                  stagger(_AllTimeCard(AllTimeStats.from(activities))),
+                  const SizedBox(height: 16),
+                  stagger(const _GearCard()),
+                  const SizedBox(height: 16),
+                  stagger(const _SettingsCard()),
+                  if (!signedIn) ...[
+                    const SizedBox(height: 20),
+                    stagger(GuestBenefitsGrid(key: _benefitsKey)),
+                  ],
                   const SizedBox(height: 20),
-                  stagger(GuestBenefitsGrid(key: _benefitsKey)),
+                  stagger(_AccountActions(signedIn: signedIn)),
                 ],
-                const SizedBox(height: 20),
-                stagger(_AccountActions(signedIn: signedIn)),
-              ],
+              ),
             ),
           ),
         ),
