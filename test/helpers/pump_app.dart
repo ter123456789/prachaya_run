@@ -18,6 +18,7 @@ class TestApp {
   final reminders = FakeReminderScheduler();
   final reminderSettings = InMemoryReminderSettings();
   final tracker = FakeLocationTracker();
+  final heartRate = FakeHeartRateMonitor();
 
   /// Pumps the whole app on a phone-sized screen with reduced motion (so
   /// looping animations stop and pumpAndSettle ends).
@@ -44,6 +45,7 @@ class TestApp {
         reminderScheduler: reminders,
         reminderSettings: reminderSettings,
         locationTracker: tracker,
+        heartRateMonitor: heartRate,
         photoSource: FakePhotoSource(),
         imageSink: FakeImageSink(),
       ),

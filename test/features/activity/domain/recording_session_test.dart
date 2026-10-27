@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:prachaya_run/features/activity/domain/entities/activity_type.dart';
+import 'package:prachaya_run/features/activity/domain/entities/heart_rate.dart';
 import 'package:prachaya_run/features/activity/domain/entities/recording_session.dart';
 
 import '../../../helpers/fakes.dart';
@@ -117,6 +118,49 @@ void main() {
       expect(session.segments, hasLength(2));
       expect(session.distanceMeters, closeTo(59 * 3.5 + 59 * 3, 0.5));
       expect(session.movingTime(at(240)), const Duration(minutes: 2));
+    });
+  });
+
+  group('heart rate', () {
+    DateTime at(double seconds) =>
+        t0.add(Duration(milliseconds: (seconds * 1000).round()));
+
+    test('keeps the latest sample of each second, none while paused', () {
+      final session = newSession()..addPoint(pointAt(0));
+      expect(session.addHeartRate(120, at(0)), isTrue);
+      expect(session.addHeartRate(122, at(0.5)), isTrue); // replaces 120
+      expect(session.addHeartRate(125, at(1.2)), isTrue);
+      expect(session.addHeartRate(99, at(1.1)), isFalse); // out of order
+      session.pause(at(2));
+      expect(session.addHeartRate(130, at(3)), isFalse);
+      session.resume(at(10));
+      session.addHeartRate(140, at(11));
+      expect(session.heartRate.map((s) => s.bpm), [122, 125, 140]);
+    });
+
+    test('goes into the activity as a Bluetooth track', () {
+      final session = newSession()
+        ..addPoint(pointAt(0))
+        ..addPoint(pointAt(1))
+        ..addHeartRate(130, at(5));
+      final activity = session.toActivity(id: 'a', title: 'x', endedAt: at(60));
+      expect(activity.heartRate!.source, HeartRateSource.ble);
+      expect(activity.heartRate!.samples.single.bpm, 130);
+      final none = newSession()..addPoint(pointAt(0));
+      expect(
+        none.toActivity(id: 'b', title: 'x', endedAt: at(60)).heartRate,
+        isNull,
+      );
+    });
+
+    test('pauseFrom drops the samples taken in the vehicle', () {
+      final session = newSession()..addPoint(pointAt(0));
+      for (var s = 0; s < 60; s++) {
+        session.addHeartRate(120 + s, at(s.toDouble()));
+      }
+      session.pauseFrom(at(30), at(60));
+      expect(session.heartRate.last.timestamp, at(30));
+      expect(session.heartRate, hasLength(31));
     });
   });
 }

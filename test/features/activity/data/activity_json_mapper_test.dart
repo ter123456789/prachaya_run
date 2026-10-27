@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:prachaya_run/features/activity/data/models/activity_json_mapper.dart';
+import 'package:prachaya_run/features/activity/domain/entities/activity.dart';
 
 import '../../../helpers/fakes.dart';
 
@@ -40,5 +41,37 @@ void main() {
     expect(summary.elevationGainMeters, 42.0);
     expect(summary.isDeleted, isTrue);
     expect(summary.updatedAt.isUtc, isFalse);
+  });
+
+  test('heart rate (v1.5): t in ms since startedAt; null without one', () {
+    final a = sampleActivity();
+    final activity = Activity(
+      id: a.id,
+      type: a.type,
+      title: a.title,
+      startedAt: a.startedAt,
+      endedAt: a.endedAt,
+      movingTime: a.movingTime,
+      segments: a.segments,
+      heartRate: sampleHeartRate(),
+    );
+    final json = ActivityJsonMapper.activityToJson(activity, updatedAt: t0);
+    expect(json['heartRate'], {
+      'source': 'ble',
+      'samples': [
+        {'t': 5000, 'bpm': 128},
+        {'t': 6000, 'bpm': 131},
+        {'t': 7000, 'bpm': 135},
+      ],
+    });
+    expect(
+      ActivityJsonMapper.activityFromJson(json).heartRate,
+      sampleHeartRate(),
+    );
+
+    final none = ActivityJsonMapper.activityToJson(a, updatedAt: t0);
+    expect(none.containsKey('heartRate'), isTrue);
+    expect(none['heartRate'], isNull);
+    expect(ActivityJsonMapper.activityFromJson(none).heartRate, isNull);
   });
 }

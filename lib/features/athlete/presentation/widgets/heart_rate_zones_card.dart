@@ -8,6 +8,16 @@ import '../../../../core/widgets/status_pill.dart';
 import '../../domain/services/heart_rate_zones.dart';
 import '../athlete_labels.dart';
 
+/// The colour of zone 1–5 wherever zones show (profile, recording,
+/// activity detail).
+Color heartRateZoneColor(int zone) => switch (zone) {
+  5 => AppColors.textMuted,
+  4 => AppColors.lime.withValues(alpha: 0.55),
+  3 => AppColors.secondary.withValues(alpha: 0.75),
+  2 => AppColors.mint,
+  _ => AppColors.textMuted.withValues(alpha: 0.35),
+};
+
 /// Five zones, top first, each bar as wide as the zone's upper % of Max HR.
 /// The focus zone is lifted out with its purpose.
 class HeartRateZonesCard extends StatelessWidget {
@@ -85,13 +95,7 @@ class _ZoneRow extends StatelessWidget {
   final HeartRateZone zone;
   final bool focus;
 
-  Color get _color => switch (zone.number) {
-    5 => AppColors.textMuted,
-    4 => AppColors.lime.withValues(alpha: 0.55),
-    3 => AppColors.secondary.withValues(alpha: 0.75),
-    2 => AppColors.mint,
-    _ => AppColors.textMuted.withValues(alpha: 0.35),
-  };
+  Color get _color => heartRateZoneColor(zone.number);
 
   String get _range => zone.number == 5
       ? '≥${zone.lowBpm} bpm'

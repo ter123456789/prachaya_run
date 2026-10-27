@@ -247,7 +247,11 @@ class FakeServer {
     if (stored == null || stored['deletedAt'] != null) {
       return _error(404, 'not_found');
     }
-    return _json(200, {..._summary(stored), 'segments': stored['segments']});
+    return _json(200, {
+      ..._summary(stored),
+      'segments': stored['segments'],
+      'heartRate': stored['heartRate'],
+    });
   }
 
   /// docs/api.md v1.2: upsert with last-write-wins, soft delete, feed.
@@ -300,7 +304,8 @@ class FakeServer {
 
   Map<String, Object?> _summary(Map<String, Object?> a) => {
     for (final e in a.entries)
-      if (e.key != 'segments' && !e.key.startsWith('_')) e.key: e.value,
+      if (e.key != 'segments' && e.key != 'heartRate' && !e.key.startsWith('_'))
+        e.key: e.value,
     'photoCount': _photoCount(a['id']! as String),
   };
 

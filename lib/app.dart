@@ -8,6 +8,7 @@ import 'features/activity/domain/repositories/activity_repository.dart';
 import 'features/activity/domain/repositories/challenge_repository.dart';
 import 'features/activity/domain/entities/activity_type.dart';
 import 'features/activity/domain/services/activity_sync.dart';
+import 'features/activity/domain/services/heart_rate_monitor.dart';
 import 'features/activity/domain/services/location_tracker.dart';
 import 'features/activity/domain/services/recording_mirror.dart';
 import 'features/activity/domain/services/voice_coach.dart';
@@ -15,6 +16,7 @@ import 'features/activity/domain/services/weather_service.dart';
 import 'features/activity/domain/usecases/save_activity.dart';
 import 'features/activity/presentation/activity_refresh.dart';
 import 'features/activity/presentation/bloc/dashboard/dashboard_cubit.dart';
+import 'features/activity/presentation/bloc/heart_rate/heart_rate_cubit.dart';
 import 'features/activity/presentation/bloc/history/history_cubit.dart';
 import 'features/activity/presentation/bloc/record/record_bloc.dart';
 import 'features/activity/presentation/bloc/sync/sync_cubit.dart';
@@ -68,6 +70,7 @@ class PrachayaRunApp extends StatelessWidget {
     this.challengeRepository,
     this.weatherService,
     required this.locationTracker,
+    this.heartRateMonitor,
     required this.photoSource,
     required this.imageSink,
     this.debugTools,
@@ -100,6 +103,9 @@ class PrachayaRunApp extends StatelessWidget {
   final ChallengeRepository? challengeRepository;
   final WeatherService? weatherService;
   final LocationTracker locationTracker;
+
+  /// Bluetooth heart-rate sensor; none in tests.
+  final HeartRateMonitor? heartRateMonitor;
   final PhotoSource photoSource;
   final ImageSink imageSink;
 
@@ -127,6 +133,7 @@ class PrachayaRunApp extends StatelessWidget {
           BlocProvider(
             create: (_) => RecordBloc(
               locationTracker: locationTracker,
+              heartRateMonitor: heartRateMonitor,
               saveActivity: SaveActivity(
                 activityRepository,
                 // Runs and hikes count toward the primary shoe.
@@ -139,6 +146,9 @@ class PrachayaRunApp extends StatelessWidget {
               ),
               clock: clock,
             ),
+          ),
+          BlocProvider(
+            create: (_) => HeartRateCubit(heartRateMonitor)..start(),
           ),
           BlocProvider(create: (_) => HistoryCubit(activityRepository)..load()),
           BlocProvider(

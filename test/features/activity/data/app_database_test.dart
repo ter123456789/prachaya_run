@@ -173,12 +173,15 @@ void main() {
       'synced': 1,
     });
     await v5.execute('DROP TABLE ${AppDatabase.routesTable}');
+    await v5.execute(
+      'ALTER TABLE ${AppDatabase.activitiesTable} DROP COLUMN heart_rate',
+    );
     await v5.setVersion(4);
     await v5.close();
 
     final db = await AppDatabase.open(factory: factory, path: path);
     addTearDown(db.close);
-    expect(await db.getVersion(), 5);
+    expect(await db.getVersion(), AppDatabase.version);
     expect((await db.query(AppDatabase.shoesTable)).single['id'], 's1');
     expect(await db.query(AppDatabase.routesTable), isEmpty);
     await db.insert(AppDatabase.routesTable, {
@@ -188,5 +191,36 @@ void main() {
       'updated_at': 1,
     });
     expect((await db.query(AppDatabase.routesTable)).single['synced'], 0);
+  });
+
+  test('v5 → v6 keeps activities and adds an empty heart_rate', () async {
+    final dir = Directory.systemTemp.createTempSync('prachaya_db');
+    addTearDown(() => dir.deleteSync(recursive: true));
+    final path = '${dir.path}/test.db';
+    // A v5 database: the current schema without the v6 column.
+    final current = await AppDatabase.open(factory: factory, path: path);
+    await current.execute(
+      'ALTER TABLE ${AppDatabase.activitiesTable} DROP COLUMN heart_rate',
+    );
+    await current.insert(AppDatabase.activitiesTable, {
+      'id': 'a1',
+      'type': 'run',
+      'title': 'v5 run',
+      'started_at': 0,
+      'ended_at': 1000,
+      'moving_time_ms': 1000,
+      'distance_m': 100,
+      'elevation_gain_m': 0,
+    });
+    await current.setVersion(5);
+    await current.close();
+
+    final db = await AppDatabase.open(factory: factory, path: path);
+    addTearDown(db.close);
+    expect(await db.getVersion(), 6);
+    final row = (await db.query(AppDatabase.activitiesTable)).single;
+    expect(row['title'], 'v5 run');
+    expect(row.containsKey('heart_rate'), isTrue);
+    expect(row['heart_rate'], isNull);
   });
 }

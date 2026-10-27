@@ -6,6 +6,9 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:prachaya_run/core/layout/content_width.dart';
 import 'package:prachaya_run/features/activity/presentation/pages/activity_detail_page.dart';
+import 'package:prachaya_run/features/activity/domain/entities/activity.dart';
+import 'package:prachaya_run/features/activity/domain/services/heart_rate_monitor.dart';
+import 'package:prachaya_run/features/activity/presentation/bloc/heart_rate/heart_rate_cubit.dart';
 import 'package:prachaya_run/features/activity/presentation/bloc/record/record_bloc.dart';
 import 'package:prachaya_run/features/activity/presentation/pages/home_page.dart';
 import 'package:prachaya_run/features/activity/presentation/pages/record_page.dart';
@@ -50,7 +53,18 @@ void main() {
   for (final MapEntry(key: name, value: (size, padding)) in _screens.entries) {
     testWidgets('every page fits the iPhone Duo $name screen', (tester) async {
       final app = TestApp();
-      final activity = sampleActivity();
+      final sample = sampleActivity();
+      // With heart rate, so the detail page shows its card too.
+      final activity = Activity(
+        id: sample.id,
+        type: sample.type,
+        title: sample.title,
+        startedAt: sample.startedAt,
+        endedAt: sample.endedAt,
+        movingTime: sample.movingTime,
+        segments: sample.segments,
+        heartRate: sampleHeartRate(),
+      );
       app.activities.store[activity.id] = activity;
       const route = PlannedRoute(
         id: 'r1',
@@ -93,10 +107,22 @@ void main() {
         await tester.pumpAndSettle();
       }
 
+      // A connected sensor adds a bpm pill and tile on the record page.
+      tester
+          .element(find.byType(HomePage))
+          .read<HeartRateCubit>()
+          .connect(const HeartRateSensor(id: 'h', name: 'Polar H10'));
+      await tester.pumpAndSettle();
+      app.heartRate
+        ..emitStatus(SensorLink.connected)
+        ..emitReading(142);
+      await tester.pumpAndSettle();
+
       await tester.tap(find.byTooltip('เริ่มบันทึก'));
       await tester.pumpAndSettle();
       expect(find.text('บันทึกกิจกรรม'), findsOneWidget);
       expect(find.byTooltip('เริ่ม'), findsOneWidget);
+      expect(find.text('ชีพจร'), findsOneWidget);
 
       // Recording paused by a car ride, with its notice over the track.
       await tester.tap(find.byTooltip('เริ่ม'));

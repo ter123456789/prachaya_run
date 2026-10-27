@@ -5,6 +5,7 @@ import UserNotifications
 @main
 @objc class AppDelegate: FlutterAppDelegate, FlutterImplicitEngineDelegate {
   private var liveActivity: LiveActivityBridge?
+  private var heartRate: HeartRateBridge?
 
   override func application(
     _ application: UIApplication,
@@ -20,5 +21,6 @@ import UserNotifications
   func didInitializeImplicitFlutterEngine(_ engineBridge: FlutterImplicitEngineBridge) {
     GeneratedPluginRegistrant.register(with: engineBridge.pluginRegistry)
     liveActivity = LiveActivityBridge(messenger: engineBridge.applicationRegistrar.messenger())
+    heartRate = HeartRateBridge(messenger: engineBridge.applicationRegistrar.messenger())
   }
 }

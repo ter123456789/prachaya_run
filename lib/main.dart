@@ -22,6 +22,7 @@ import 'features/activity/data/repositories/offline_first_photo_repository.dart'
 import 'features/activity/data/services/android_recording_notification.dart';
 import 'features/activity/data/services/geolocator_location_tracker.dart';
 import 'features/activity/data/services/ios_live_activity_mirror.dart';
+import 'features/activity/data/services/native_heart_rate_monitor.dart';
 import 'features/activity/data/services/tts_voice_coach.dart';
 import 'features/activity/data/services/open_meteo_weather_service.dart';
 import 'features/activity/data/sync/activity_sync_engine.dart';
@@ -35,6 +36,7 @@ import 'features/auth/data/sync/profile_store.dart';
 import 'features/auth/data/sync/profile_sync.dart';
 import 'features/debug/data/debug_http_client.dart';
 import 'features/debug/data/device_debug_tools.dart';
+import 'features/debug/data/simulated_heart_rate_monitor.dart';
 import 'features/debug/data/simulated_location_tracker.dart';
 import 'features/debug/data/virtual_clock.dart';
 import 'features/photo_share/data/services/device_image_sink.dart';
@@ -92,6 +94,7 @@ Future<void> main() async {
   final simTracker = kDebugMode
       ? SimulatedLocationTracker(realTracker, clock!)
       : null;
+  final realHeartRate = NativeHeartRateMonitor(kv);
 
   runApp(
     PrachayaRunApp(
@@ -153,6 +156,9 @@ Future<void> main() async {
       challengeRepository: HttpChallengeRepository(api, tokens, kv),
       weatherService: OpenMeteoWeatherService(http.Client(), kv),
       locationTracker: simTracker ?? realTracker,
+      heartRateMonitor: kDebugMode
+          ? SimulatedHeartRateMonitor(realHeartRate, clock!)
+          : realHeartRate,
       photoSource: ImagePickerPhotoSource(),
       imageSink: DeviceImageSink(),
       clock: clock?.now,

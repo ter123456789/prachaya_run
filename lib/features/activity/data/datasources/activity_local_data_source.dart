@@ -363,8 +363,16 @@ class ActivityLocalDataSource {
     );
   }
 
-  static Future<void> _deleteTrack(DatabaseExecutor db, String id) =>
-      db.delete(_points, where: 'activity_id = ?', whereArgs: [id]);
+  /// The GPS points and the heart rate that goes with them.
+  static Future<void> _deleteTrack(DatabaseExecutor db, String id) async {
+    await db.delete(_points, where: 'activity_id = ?', whereArgs: [id]);
+    await db.update(
+      _activities,
+      {'heart_rate': null},
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
 
   static Future<void> _replaceTrack(Transaction txn, Activity activity) async {
     await _deleteTrack(txn, activity.id);
@@ -373,5 +381,11 @@ class ActivityLocalDataSource {
       batch.insert(_points, row);
     }
     await batch.commit(noResult: true);
+    await txn.update(
+      _activities,
+      {'heart_rate': ActivityRowMapper.heartRateToColumn(activity)},
+      where: 'id = ?',
+      whereArgs: [activity.id],
+    );
   }
 }

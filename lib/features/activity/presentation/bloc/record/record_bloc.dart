@@ -6,6 +6,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../domain/entities/activity_type.dart';
 import '../../../domain/entities/recording_session.dart';
 import '../../../domain/entities/track_point.dart';
+import '../../../domain/services/heart_rate_measurement.dart';
+import '../../../domain/services/heart_rate_monitor.dart';
 import '../../../domain/services/location_tracker.dart';
 import '../../../domain/services/vehicle_detector.dart';
 import '../../../domain/usecases/save_activity.dart';
@@ -18,6 +20,7 @@ class RecordBloc extends Bloc<RecordEvent, RecordState> {
   RecordBloc({
     required LocationTracker locationTracker,
     required SaveActivity saveActivity,
+    HeartRateMonitor? heartRateMonitor,
     DateTime Function()? clock,
     this.tickInterval = const Duration(seconds: 1),
   }) : _tracker = locationTracker,
@@ -34,6 +37,12 @@ class RecordBloc extends Bloc<RecordEvent, RecordState> {
     on<_LocationReceived>(_onLocationReceived);
     on<_LocationFailed>(_onLocationFailed);
     on<_Ticked>(_onTicked);
+    on<_HeartRateReceived>(_onHeartRate);
+    // The sensor is paired on its own (HeartRateCubit); readings count
+    // only while recording.
+    _heartRateSub = heartRateMonitor?.readings.listen(
+      (reading) => add(_HeartRateReceived(reading)),
+    );
   }
 
   final LocationTracker _tracker;
@@ -45,6 +54,7 @@ class RecordBloc extends Bloc<RecordEvent, RecordState> {
   VehicleDetector? _vehicle;
   StreamSubscription<TrackPoint>? _locationSub;
   StreamSubscription<void>? _tickerSub;
+  StreamSubscription<HeartRateReading>? _heartRateSub;
 
   void _onTypeChanged(RecordTypeChanged event, Emitter<RecordState> emit) {
     if (state.status != RecordStatus.idle) return;
@@ -98,6 +108,14 @@ class RecordBloc extends Bloc<RecordEvent, RecordState> {
       session.resumeFrom(change.since, fixes, now);
       emit(_withLaps(session, RecordStatus.recording, inVehicle: false));
     }
+  }
+
+  /// Stamped with the recording clock (the debug clock may run fast).
+  void _onHeartRate(_HeartRateReceived event, Emitter<RecordState> emit) {
+    final session = _session;
+    if (session == null || state.status != RecordStatus.recording) return;
+    if (!event.reading.isUsable) return;
+    session.addHeartRate(event.reading.bpm, _clock());
   }
 
   void _onTicked(_Ticked event, Emitter<RecordState> emit) {
@@ -260,6 +278,7 @@ class RecordBloc extends Bloc<RecordEvent, RecordState> {
   @override
   Future<void> close() async {
     await _stopStreams();
+    await _heartRateSub?.cancel();
     return super.close();
   }
 }

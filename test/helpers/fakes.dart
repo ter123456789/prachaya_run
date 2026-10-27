@@ -4,9 +4,12 @@ import 'dart:typed_data';
 
 import 'package:prachaya_run/features/activity/domain/entities/activity.dart';
 import 'package:prachaya_run/features/activity/domain/entities/activity_type.dart';
+import 'package:prachaya_run/features/activity/domain/entities/heart_rate.dart';
 import 'package:prachaya_run/features/activity/domain/entities/track_point.dart';
 import 'package:prachaya_run/features/activity/domain/repositories/activity_repository.dart';
 import 'package:prachaya_run/features/activity/domain/services/activity_sync.dart';
+import 'package:prachaya_run/features/activity/domain/services/heart_rate_measurement.dart';
+import 'package:prachaya_run/features/activity/domain/services/heart_rate_monitor.dart';
 import 'package:prachaya_run/features/activity/domain/services/location_tracker.dart';
 import 'package:prachaya_run/features/auth/domain/entities/auth_user.dart';
 import 'package:prachaya_run/features/auth/domain/repositories/auth_repository.dart';
@@ -99,6 +102,56 @@ class FakeLocationTracker implements LocationTracker {
   Stream<TrackPoint> watch(ActivityType type) {
     controller = StreamController<TrackPoint>();
     return controller!.stream;
+  }
+}
+
+class FakeHeartRateMonitor implements HeartRateMonitor {
+  FakeHeartRateMonitor({this.remembered});
+
+  SensorAccess access = SensorAccess.granted;
+  HeartRateSensor? remembered;
+  HeartRateSensor? connected;
+  StreamController<List<HeartRateSensor>>? scanning;
+  final _status = StreamController<SensorStatus>.broadcast();
+  final _readings = StreamController<HeartRateReading>.broadcast();
+
+  void emitStatus(SensorLink link) =>
+      _status.add(SensorStatus(link, connected));
+  void emitReading(int bpm, {bool? contact}) =>
+      _readings.add(HeartRateReading(bpm: bpm, skinContact: contact));
+
+  @override
+  Stream<SensorStatus> get status => _status.stream;
+
+  @override
+  Stream<HeartRateReading> get readings => _readings.stream;
+
+  @override
+  Future<SensorAccess> requestAccess() async => access;
+
+  @override
+  Stream<List<HeartRateSensor>> scan() {
+    scanning = StreamController<List<HeartRateSensor>>(
+      onCancel: () => scanning = null,
+    );
+    return scanning!.stream;
+  }
+
+  @override
+  Future<void> connect(HeartRateSensor sensor) async {
+    connected = remembered = sensor;
+    emitStatus(SensorLink.connecting);
+  }
+
+  @override
+  Future<void> reconnect() async {
+    if (remembered case final sensor?) await connect(sensor);
+  }
+
+  @override
+  Future<void> disconnect() async {
+    connected = remembered = null;
+    emitStatus(SensorLink.disconnected);
   }
 }
 
@@ -385,6 +438,18 @@ class FakeImageSink implements ImageSink {
     ShareAnchor? anchor,
   }) async => shared.add(png);
 }
+
+/// Three Bluetooth samples a second apart, starting 5 s after [t0].
+HeartRateTrack sampleHeartRate() => HeartRateTrack(
+  source: HeartRateSource.ble,
+  samples: [
+    for (final (i, bpm) in [128, 131, 135].indexed)
+      HeartRateSample(
+        timestamp: t0.add(Duration(seconds: 5 + i)),
+        bpm: bpm,
+      ),
+  ],
+);
 
 Activity sampleActivity({ActivityType type = ActivityType.run}) => Activity(
   id: 'a1',

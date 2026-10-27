@@ -1,5 +1,8 @@
+import 'dart:convert';
+
 import '../../domain/entities/activity.dart';
 import '../../domain/entities/activity_type.dart';
+import '../../domain/entities/heart_rate.dart';
 import '../../domain/entities/track_point.dart';
 import 'remote_activity_summary.dart';
 
@@ -72,6 +75,39 @@ abstract final class ActivityRowMapper {
     }
   }
 
+  /// The `heart_rate` column: samples as `[t, bpm]` pairs, t in ms since
+  /// the start (compact: about one sample a second).
+  static String? heartRateToColumn(Activity a) {
+    final hr = a.heartRate;
+    if (hr == null) return null;
+    final start = a.startedAt.millisecondsSinceEpoch;
+    return jsonEncode({
+      'source': hr.source.name,
+      'samples': [
+        for (final s in hr.samples)
+          [s.timestamp.millisecondsSinceEpoch - start, s.bpm],
+      ],
+    });
+  }
+
+  static HeartRateTrack? heartRateFromColumn(Object? value, DateTime start) {
+    if (value == null) return null;
+    final json = jsonDecode(value as String) as Map<String, Object?>;
+    final base = start.millisecondsSinceEpoch;
+    return HeartRateTrack(
+      source: HeartRateSource.values.byName(json['source']! as String),
+      samples: [
+        for (final pair in (json['samples']! as List<Object?>).cast<List>())
+          HeartRateSample(
+            timestamp: DateTime.fromMillisecondsSinceEpoch(
+              base + (pair[0] as num).toInt(),
+            ),
+            bpm: (pair[1] as num).toInt(),
+          ),
+      ],
+    );
+  }
+
   static ActivitySummary summaryFromRow(Row row) => ActivitySummary(
     id: row['id']! as String,
     type: ActivityType.values.byName(row['type']! as String),
@@ -103,15 +139,17 @@ abstract final class ActivityRowMapper {
         ),
       );
     }
+    final startedAt = _time(row['started_at']);
     return Activity(
       id: row['id']! as String,
       type: ActivityType.values.byName(row['type']! as String),
       title: row['title']! as String,
-      startedAt: _time(row['started_at']),
+      startedAt: startedAt,
       endedAt: _time(row['ended_at']),
       movingTime: Duration(milliseconds: row['moving_time_ms']! as int),
       segments: segments,
       shoeId: row['shoe_id'] as String?,
+      heartRate: heartRateFromColumn(row['heart_rate'], startedAt),
     );
   }
 

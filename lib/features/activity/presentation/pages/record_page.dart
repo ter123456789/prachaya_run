@@ -14,12 +14,17 @@ import '../../../../core/widgets/pill_tabs.dart';
 import '../../../../core/widgets/status_pill.dart';
 import '../../domain/entities/activity_type.dart';
 import '../../domain/entities/route_shape.dart';
+import '../../domain/services/heart_rate_monitor.dart';
 import '../../domain/services/live_metrics.dart';
 import '../../../../core/units/unit_labels.dart';
+import '../../../athlete/domain/services/heart_rate_zones.dart';
 import '../../../athlete/presentation/units.dart';
+import '../../../auth/presentation/bloc/profile_cubit.dart';
 import '../activity_labels.dart';
 import '../activity_refresh.dart';
+import '../bloc/heart_rate/heart_rate_cubit.dart';
 import '../bloc/record/record_bloc.dart';
+import '../widgets/heart_rate_sensor_sheet.dart';
 import '../widgets/route_canvas.dart';
 import '../widgets/route_map.dart';
 import 'activity_detail_page.dart';
@@ -231,12 +236,51 @@ class _StatusRow extends StatelessWidget {
           ),
         ),
         const SizedBox(width: 8),
+        const _SensorButton(),
         StatusPill(
           text: gps,
           icon: Icons.satellite_alt_rounded,
           color: gpsColor,
         ),
       ],
+    );
+  }
+}
+
+/// Opens the sensor sheet; shows the live bpm once a sensor is connected.
+class _SensorButton extends StatelessWidget {
+  const _SensorButton();
+
+  @override
+  Widget build(BuildContext context) {
+    final hr = context.watch<HeartRateCubit>().state;
+    if (!hr.available) return const SizedBox.shrink();
+    final bpm = hr.bpm;
+    final (text, color) = switch (hr.link) {
+      SensorLink.connected => (
+        bpm == null ? '--' : '$bpm',
+        bpm == null ? AppColors.textSecondary : AppColors.lime,
+      ),
+      SensorLink.connecting => ('…', AppColors.textSecondary),
+      SensorLink.noHeartRate => ('!', AppColors.negative),
+      SensorLink.disconnected => ('เซนเซอร์', AppColors.textSecondary),
+    };
+    return Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: Tooltip(
+        message: 'เซนเซอร์ชีพจร',
+        child: GestureDetector(
+          onTap: () => HeartRateSensorSheet.show(context),
+          child: StatusPill(
+            text: text,
+            icon: hr.connected
+                ? Icons.favorite_rounded
+                : Icons.favorite_border_rounded,
+            color: color,
+            mono: hr.connected,
+          ),
+        ),
+      ),
     );
   }
 }
@@ -550,12 +594,43 @@ class _Tiles extends StatelessWidget {
           color: AppColors.lime,
         ),
         const SizedBox(width: 10),
-        _Tile(
-          label: 'ขึ้นสะสม',
-          value: '${state.elevationGainMeters.round()}',
-          unit: 'ม.',
-        ),
+        if (context.select((HeartRateCubit c) => c.state.sensor != null))
+          const _HeartRateTile()
+        else
+          _Tile(
+            label: 'ขึ้นสะสม',
+            value: '${state.elevationGainMeters.round()}',
+            unit: 'ม.',
+          ),
       ],
+    );
+  }
+}
+
+/// Live bpm and its zone (when the profile gives a Max HR).
+class _HeartRateTile extends StatelessWidget {
+  const _HeartRateTile();
+
+  @override
+  Widget build(BuildContext context) {
+    final bpm = context.select((HeartRateCubit c) => c.state.bpm);
+    final profile = context.select((ProfileCubit c) => c.state.profile);
+    final maxHr = resolveMaxHr(
+      enteredBpm: profile.maxHrBpm,
+      birthYear: profile.birthYear,
+      today: DateTime.now(),
+    );
+    int? zone;
+    if (bpm != null && maxHr != null) {
+      for (final z in heartRateZones(maxHr.bpm)) {
+        if (bpm >= z.lowBpm) zone = z.number;
+      }
+    }
+    return _Tile(
+      label: 'ชีพจร',
+      value: bpm == null ? '--' : '$bpm',
+      unit: zone == null ? 'bpm' : 'bpm · Z$zone',
+      color: AppColors.lime,
     );
   }
 }

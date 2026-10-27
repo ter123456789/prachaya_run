@@ -37,6 +37,7 @@ import '../../../athlete/presentation/units.dart';
 import '../activity_labels.dart';
 import '../activity_refresh.dart';
 import '../bloc/detail/activity_detail_cubit.dart';
+import '../widgets/heart_rate_card.dart';
 import '../widgets/route_map.dart';
 
 class ActivityDetailPage extends StatelessWidget {
@@ -219,6 +220,10 @@ class _Body extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 16),
+        if (activity.heartRate case final heartRate?) ...[
+          stagger(HeartRateCard(heartRate)),
+          const SizedBox(height: 12),
+        ],
         stagger(_EnergyCard(activity)),
         if (activity.type != ActivityType.ride) ...[
           const SizedBox(height: 12),
@@ -536,8 +541,8 @@ class _StatBento extends StatelessWidget {
   }
 }
 
-/// Calories in place of the reference design's heart-rate card: the app
-/// has no HR sensor, but energy is estimated from distance and weight.
+/// Energy estimated from distance and weight (MET). Activities recorded
+/// with a heart-rate sensor also get a HeartRateCard above it.
 class _EnergyCard extends StatelessWidget {
   const _EnergyCard(this.activity);
 

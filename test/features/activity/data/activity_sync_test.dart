@@ -12,6 +12,7 @@ import 'package:prachaya_run/features/activity/data/repositories/offline_first_a
 import 'package:prachaya_run/features/activity/data/repositories/offline_first_photo_repository.dart';
 import 'package:prachaya_run/features/activity/data/sync/activity_sync_engine.dart';
 import 'package:prachaya_run/features/activity/domain/entities/activity.dart';
+import 'package:prachaya_run/features/activity/domain/entities/heart_rate.dart';
 import 'package:prachaya_run/features/activity/domain/services/activity_sync.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
@@ -21,7 +22,11 @@ import '../../../helpers/memory_token_store.dart';
 
 const _id = '3f2b8c1e-9d4a-4b7e-8f21-6c0d5e9a1b23';
 
-Activity _activity({String id = _id, String title = 'วิ่งตอนเช้า'}) {
+Activity _activity({
+  String id = _id,
+  String title = 'วิ่งตอนเช้า',
+  HeartRateTrack? heartRate,
+}) {
   final a = sampleActivity();
   return Activity(
     id: id,
@@ -31,6 +36,7 @@ Activity _activity({String id = _id, String title = 'วิ่งตอนเช
     endedAt: a.endedAt,
     movingTime: a.movingTime,
     segments: a.segments,
+    heartRate: heartRate,
   );
 }
 
@@ -168,6 +174,28 @@ void main() {
       expect(await repository.getAll(), isEmpty);
     },
   );
+
+  test('heart rate goes up with the activity and comes back with the track '
+      'on another device (v1.5)', () async {
+    await repository.save(_activity(heartRate: sampleHeartRate()));
+    expect((await repository.getById(_id))!.heartRate, sampleHeartRate());
+    await engine.sync();
+    final sent = server.uploads.single['heartRate']! as Map<String, Object?>;
+    expect(sent['source'], 'ble');
+    expect((sent['samples']! as List).first, {'t': 5000, 'bpm': 128});
+
+    // Another device: the feed has no heart rate; opening loads it.
+    const otherId = '0a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d';
+    server.seed(
+      ActivityJsonMapper.activityToJson(
+        _activity(id: otherId, heartRate: sampleHeartRate()),
+        updatedAt: now,
+      ),
+    );
+    await engine.sync();
+    final full = await repository.getById(otherId);
+    expect(full!.heartRate, sampleHeartRate());
+  });
 
   test('server copy newer than the upload wins', () async {
     await repository.save(_activity());

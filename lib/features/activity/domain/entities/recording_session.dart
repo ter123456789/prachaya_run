@@ -3,6 +3,7 @@ import 'dart:collection';
 import '../services/geo_math.dart';
 import 'activity.dart';
 import 'activity_type.dart';
+import 'heart_rate.dart';
 import 'track_point.dart';
 
 /// An in-progress recording: filters noisy GPS fixes, tracks pauses and
@@ -26,6 +27,7 @@ class RecordingSession {
 
   final List<List<TrackPoint>> _segments = [<TrackPoint>[]];
   final List<LapMark> _laps = [];
+  final List<HeartRateSample> _heartRate = [];
   ElevationGainCounter _elevation = ElevationGainCounter();
   Duration _accumulated = Duration.zero;
   DateTime? _runningSince;
@@ -54,6 +56,27 @@ class RecordingSession {
 
   /// Read-only view; it changes as points are added.
   List<List<TrackPoint>> get segments => UnmodifiableListView(_segments);
+
+  /// Heart rate from a sensor, oldest first (read-only view).
+  List<HeartRateSample> get heartRate => UnmodifiableListView(_heartRate);
+
+  /// Keeps at most one sample per whole second since the start (the
+  /// latest); ignored while paused. Returns whether it was kept.
+  bool addHeartRate(int bpm, DateTime at) {
+    if (isPaused) return false;
+    final sample = HeartRateSample(timestamp: at, bpm: bpm);
+    if (_heartRate.isNotEmpty) {
+      final last = _heartRate.last;
+      if (at.isBefore(last.timestamp)) return false;
+      int second(DateTime t) => t.difference(startedAt).inSeconds;
+      if (second(at) == second(last.timestamp)) {
+        _heartRate.last = sample;
+        return true;
+      }
+    }
+    _heartRate.add(sample);
+    return true;
+  }
 
   Duration movingTime(DateTime now) {
     final since = _runningSince;
@@ -93,6 +116,7 @@ class RecordingSession {
     if (since == null) return;
     final at = _clamp(from, since, now);
     _segments.last.removeWhere((p) => p.timestamp.isAfter(at));
+    _heartRate.removeWhere((s) => s.timestamp.isAfter(at));
     _recount();
     pause(at);
     _laps.removeWhere(
@@ -144,6 +168,9 @@ class RecordingSession {
     endedAt: endedAt,
     movingTime: movingTime(endedAt),
     segments: _segments.where((s) => s.isNotEmpty).toList(),
+    heartRate: _heartRate.isEmpty
+        ? null
+        : HeartRateTrack(source: HeartRateSource.ble, samples: _heartRate),
   );
 }
 

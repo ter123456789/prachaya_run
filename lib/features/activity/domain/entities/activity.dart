@@ -1,5 +1,6 @@
 import '../services/geo_math.dart';
 import 'activity_type.dart';
+import 'heart_rate.dart';
 import 'track_point.dart';
 
 /// A finished, saved activity. [segments] are separated by pauses.
@@ -13,6 +14,7 @@ class Activity {
     required this.movingTime,
     required List<List<TrackPoint>> segments,
     this.shoeId,
+    this.heartRate,
   }) : segments = List<List<TrackPoint>>.unmodifiable(
          segments.map(List<TrackPoint>.unmodifiable),
        );
@@ -27,6 +29,9 @@ class Activity {
 
   /// The shoe this activity counts toward; null when none is linked.
   final String? shoeId;
+
+  /// Null when recorded without a heart-rate sensor.
+  final HeartRateTrack? heartRate;
 
   late final double distanceMeters = _computeDistance();
   late final double elevationGainMeters = _computeElevationGain();
@@ -52,6 +57,7 @@ class Activity {
     movingTime: movingTime,
     segments: segments,
     shoeId: shoeId,
+    heartRate: heartRate,
   );
 
   /// Splits of [every] meters, timed by GPS timestamps (pauses excluded).

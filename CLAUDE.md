@@ -69,6 +69,7 @@ Rules (enforced for every feature by `test/architecture_test.dart`):
   their own `*_json_mapper.dart` (the record store keeps their API JSON as-is in `data`).
 - Cross-feature hooks go through domain typedefs, composed in `app.dart`: `SaveActivity` takes a
   `DefaultShoe` (primary shoe for runs/hikes) and `onSaved` hooks (CompleteWorkoutForActivity).
+- Platform-channel wrappers (`NativeHeartRateMonitor`, `IosLiveActivityMirror`) also stay in `data/`.
 - Plugin wrappers stay in `data/` (architecture_test also bans flutter_local_notifications, timezone,
   flutter_tts, sign_in_with_apple and google_sign_in from presentation).
 - Add a use case only when it holds logic (e.g. `SaveActivity` validates distance).
@@ -113,6 +114,9 @@ Rules (enforced for every feature by `test/architecture_test.dart`):
   `VALHALLA_URL` → 503 `provider_not_configured`. Needs an account; signed out or offline the drawing
   alone can be saved (`route: null`). The app scores the fit itself (`route_fit.dart`: share of the route
   within 6 % of the shape's size of the drawing, and share of the drawing covered; detours shown amber).
+- DB v6 adds `activities.heart_rate` (JSON `{source, samples: [[t, bpm]]}`, t = ms since start). It is
+  part of the track: written by `_replaceTrack`, cleared by `_deleteTrack`. API v1.5 sends it as
+  `heartRate {source, samples: [{t, bpm}]}` on the full activity only (not summary/list/feed).
 - DB v3 adds `activity_photos` (offline-first photos, files named by photo id under app docs `photos/`),
   `activities.photo_count/photos_stale`, and a `kv` JSON cache (profile, challenge, weather).
 - DB v2 columns: `updated_at` (last-write-wins), `deleted_at` (tombstone until DELETE succeeds),
@@ -133,8 +137,7 @@ Rules (enforced for every feature by `test/architecture_test.dart`):
   CountUpText, ProgressRing, PillTabs (sliding lime thumb), AppChip, StatusPill/PulseDot, AppTopBar,
   AvatarButton, SectionHeader, FloatingDock + OrbButton, Shimmer, EdgeFade, FadeSlideIn, FadeIndexedStack.
   `features/activity/presentation/widgets/route_canvas.dart` draws the self-animating luminescent route.
-- Not in the app on purpose: heart rate (no sensor; detail shows estimated calories instead),
-  notification bell, place names. Profile 08 hides resting HR, VO2 Max, fitness age, sensors,
+- Not in the app on purpose: notification bell, place names. Profile 08 hides resting HR, VO2 Max, fitness age, sensors,
   Strava/Apple Health and route privacy; schedule 09 hides multi-week plan names and best-time
   windows — no data source. Never show the design's sample values.
 - HR zones: Max HR = user value, else Tanaka `208 − 0.7 × age` (birth year typed in พ.ศ. or ค.ศ.);
@@ -156,6 +159,21 @@ Rules (enforced for every feature by `test/architecture_test.dart`):
   - **Taps:** the payload is `<kind>|schedule:YYYY-MM-DD` or `home`; a schedule tap opens
     `SchedulePage.route(day:)`. The OS asks for permission the first time one is turned on, or when a
     plan exists.
+- Heart rate (Bluetooth LE sensor; spec `docs/backlog/ble-heart-rate.md`):
+  - **No plugin:** `NativeHeartRateMonitor` (data) talks to our own native code on `prachaya/heart_rate`
+    (+ `/events`): `ios/Runner/HeartRateBridge.swift` (CoreBluetooth, `bluetooth-central` background mode)
+    and `android/.../HeartRateBridge.kt` (BluetoothGatt; Android 12+ SCAN/CONNECT, older: location).
+    Native forwards raw 0x2A37 bytes; `parseHeartRateMeasurement` (domain) decodes them.
+  - **Pairing:** `HeartRateCubit` (app-level) scans, connects and remembers the sensor (`kv`
+    `settings.hr_sensor`), reconnects it on launch; native keeps reconnecting after a drop. Scans list every
+    named device (heart-rate ones first): some wristbands only show 0x180D after connecting.
+  - **Recording:** `RecordBloc` reads the same monitor; `RecordingSession.addHeartRate` keeps one sample per
+    second, none while paused (a vehicle rewind drops them too). Stamped with the recording clock.
+  - **UI:** record page heart pill → `HeartRateSensorSheet`; with a sensor the "ขึ้นสะสม" tile becomes
+    "ชีพจร" (zone from `ProfileCubit` Max HR). Detail `HeartRateCard`: avg / max, curve, time in zone
+    (`summarizeHeartRate`: each sample counts ≤ 5 s). Without heart rate the detail shows calories only.
+  - **Debug:** `SimulatedHeartRateMonitor` lists "เซนเซอร์จำลอง (debug)" in every scan (simulators have no
+    Bluetooth). Tests pass `FakeHeartRateMonitor`; without a monitor `HeartRateCubit.available` is false.
 - Recording outside the app (`RecordingCompanion` in app.dart): every whole km/mi it speaks a Thai cue
   (`TtsVoiceCoach`; "Audio Cues" setting; iOS `audio` background mode).
   - **iOS Live Activity / Dynamic Island:** it mirrors `RecordState` (throttled 3 s, immediate on

@@ -1,5 +1,6 @@
 import '../../domain/entities/activity.dart';
 import '../../domain/entities/activity_type.dart';
+import '../../domain/entities/heart_rate.dart';
 import '../../domain/entities/track_point.dart';
 import 'remote_activity_summary.dart';
 
@@ -16,6 +17,7 @@ abstract final class ActivityJsonMapper {
     'movingTimeMs': a.movingTime.inMilliseconds,
     'updatedAt': time(updatedAt),
     'shoeId': a.shoeId,
+    'heartRate': heartRateToJson(a),
     'segments': [
       for (final segment in a.segments)
         [
@@ -30,6 +32,40 @@ abstract final class ActivityJsonMapper {
         ],
     ],
   };
+
+  /// api.md v1.5: samples with `t` in ms since `startedAt`.
+  static Json? heartRateToJson(Activity a) {
+    final hr = a.heartRate;
+    if (hr == null) return null;
+    final start = a.startedAt.millisecondsSinceEpoch;
+    return {
+      'source': hr.source.name,
+      'samples': [
+        for (final s in hr.samples)
+          {'t': s.timestamp.millisecondsSinceEpoch - start, 'bpm': s.bpm},
+      ],
+    };
+  }
+
+  static HeartRateTrack? heartRateFromJson(Object? value, DateTime start) {
+    if (value == null) return null;
+    final json = value as Json;
+    final source = HeartRateSource.values.asNameMap()[json['source']];
+    // A source added by a newer server: keep the samples as Bluetooth ones.
+    final base = start.millisecondsSinceEpoch;
+    return HeartRateTrack(
+      source: source ?? HeartRateSource.ble,
+      samples: [
+        for (final s in (json['samples']! as List<Object?>).cast<Json>())
+          HeartRateSample(
+            timestamp: DateTime.fromMillisecondsSinceEpoch(
+              base + (s['t']! as num).toInt(),
+            ),
+            bpm: (s['bpm']! as num).toInt(),
+          ),
+      ],
+    );
+  }
 
   static RemoteActivitySummary summaryFromJson(
     Json json,
@@ -54,28 +90,34 @@ abstract final class ActivityJsonMapper {
     takenAt: parseTime(json['takenAt']),
   );
 
-  static Activity activityFromJson(Json json) => Activity(
-    id: json['id']! as String,
-    type: ActivityType.values.byName(json['type']! as String),
-    title: json['title']! as String,
-    startedAt: parseTime(json['startedAt']),
-    endedAt: parseTime(json['endedAt']),
-    movingTime: Duration(milliseconds: (json['movingTimeMs']! as num).toInt()),
-    shoeId: json['shoeId'] as String?,
-    segments: [
-      for (final segment in json['segments']! as List<Object?>)
-        [
-          for (final p in (segment! as List<Object?>).cast<Json>())
-            TrackPoint(
-              latitude: (p['lat']! as num).toDouble(),
-              longitude: (p['lng']! as num).toDouble(),
-              altitudeMeters: (p['altitude'] as num?)?.toDouble(),
-              accuracyMeters: (p['accuracy'] as num?)?.toDouble(),
-              timestamp: parseTime(p['timestamp']),
-            ),
-        ],
-    ],
-  );
+  static Activity activityFromJson(Json json) {
+    final startedAt = parseTime(json['startedAt']);
+    return Activity(
+      id: json['id']! as String,
+      type: ActivityType.values.byName(json['type']! as String),
+      title: json['title']! as String,
+      startedAt: startedAt,
+      endedAt: parseTime(json['endedAt']),
+      movingTime: Duration(
+        milliseconds: (json['movingTimeMs']! as num).toInt(),
+      ),
+      shoeId: json['shoeId'] as String?,
+      heartRate: heartRateFromJson(json['heartRate'], startedAt),
+      segments: [
+        for (final segment in json['segments']! as List<Object?>)
+          [
+            for (final p in (segment! as List<Object?>).cast<Json>())
+              TrackPoint(
+                latitude: (p['lat']! as num).toDouble(),
+                longitude: (p['lng']! as num).toDouble(),
+                altitudeMeters: (p['altitude'] as num?)?.toDouble(),
+                accuracyMeters: (p['accuracy'] as num?)?.toDouble(),
+                timestamp: parseTime(p['timestamp']),
+              ),
+          ],
+      ],
+    );
+  }
 
   static RemoteChangesPage changesPageFromJson(Json json) => RemoteChangesPage(
     items: [

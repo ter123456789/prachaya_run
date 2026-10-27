@@ -216,4 +216,43 @@ void main() {
       await bloc.close();
     });
   });
+
+  test('heart rate from the sensor is kept only while recording', () async {
+    final monitor = FakeHeartRateMonitor();
+    final bloc = RecordBloc(
+      locationTracker: tracker,
+      heartRateMonitor: monitor,
+      saveActivity: SaveActivity(repository),
+      clock: () => now,
+      tickInterval: const Duration(hours: 1),
+    );
+    addTearDown(bloc.close);
+    monitor.emitReading(90); // before the start: ignored
+    bloc.add(const RecordStarted());
+    await pump();
+    for (var i = 0; i < 3; i++) {
+      now = t0.add(Duration(seconds: 30 * i));
+      tracker.emit(pointAt(i));
+      monitor.emitReading(140 + i);
+      await pump();
+    }
+    monitor.emitReading(150, contact: false); // strap off the skin
+    monitor.emitReading(0);
+    await pump();
+    now = t0.add(const Duration(minutes: 2));
+    bloc.add(const RecordPaused());
+    await pump();
+    monitor.emitReading(170); // paused
+    await pump();
+    bloc.add(const RecordFinished());
+    await pump();
+
+    final saved = repository.store.values.single;
+    expect(saved.heartRate!.samples.map((s) => s.bpm), [140, 141, 142]);
+    expect(saved.heartRate!.samples.map((s) => s.timestamp), [
+      t0,
+      t0.add(const Duration(seconds: 30)),
+      t0.add(const Duration(seconds: 60)),
+    ]);
+  });
 }

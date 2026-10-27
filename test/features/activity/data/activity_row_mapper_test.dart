@@ -35,4 +35,34 @@ void main() {
     final summary = ActivityRowMapper.summaryFromRow(row);
     expect(summary.distanceMeters, activity.distanceMeters);
   });
+
+  test('heart rate is stored as [t, bpm] pairs relative to the start', () {
+    final a = sampleActivity();
+    final activity = Activity(
+      id: a.id,
+      type: a.type,
+      title: a.title,
+      startedAt: a.startedAt,
+      endedAt: a.endedAt,
+      movingTime: a.movingTime,
+      segments: a.segments,
+      heartRate: sampleHeartRate(),
+    );
+    final column = ActivityRowMapper.heartRateToColumn(activity)!;
+    expect(column, contains('[5000,128]'));
+    final row = {
+      ...ActivityRowMapper.activityToRow(
+        activity,
+        updatedAt: t0,
+        ownerId: null,
+      ),
+      'heart_rate': column,
+    };
+    final restored = ActivityRowMapper.activityFromRows(
+      row,
+      ActivityRowMapper.pointsToRows(activity).toList(),
+    );
+    expect(restored.heartRate, sampleHeartRate());
+    expect(ActivityRowMapper.heartRateToColumn(sampleActivity()), isNull);
+  });
 }

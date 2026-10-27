@@ -47,3 +47,8 @@ final class _LocationFailed extends RecordEvent {
 final class _Ticked extends RecordEvent {
   const _Ticked();
 }
+
+final class _HeartRateReceived extends RecordEvent {
+  const _HeartRateReceived(this.reading);
+  final HeartRateReading reading;
+}

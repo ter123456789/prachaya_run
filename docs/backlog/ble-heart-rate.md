@@ -1,6 +1,15 @@
 # อัตราการเต้นหัวใจ (HR) จากเซนเซอร์ BLE และนาฬิกา
 
-สถานะ: **สเปก ยังไม่ได้ลงมือ** — ค้นข้อมูลไว้ 2026-10-27, เลือกทิศทางไว้ 2026-10-13
+สถานะ: **เฟส 1 ทำแล้ว 2026-10-27** (แอป + API v1.5) — เฟส 2 (นำเข้าจาก Health) ยังไม่ได้ลงมือ
+
+### ต่างจากสเปกเดิมตอนลงมือ
+- **ไม่ใช้ flutter_blue_plus** (ไลเซนส์เฉพาะ: ใช้เชิงพาณิชย์ต้องซื้อ) → เขียน native เอง
+  ตามแนว wfm-mobile: `HeartRateBridge.swift` (CoreBluetooth) / `HeartRateBridge.kt` (BluetoothGatt)
+  ผ่าน MethodChannel + EventChannel; native ส่ง byte ดิบ, Dart ถอดรหัส
+- API เป็น **v1.5** (v1.4 เป็น planned routes ไปแล้ว) และ **ไม่มี avgHr/maxHr ใน summary**
+  (ยังไม่มีหน้ารายการที่ใช้) — heartRate อยู่เฉพาะ full activity
+- DB v6 เก็บเป็น JSON ในคอลัมน์ `activities.heart_rate` (`[[t, bpm], ...]`)
+- ยังไม่ทำ: HR ใน Live Activity / Android notification, voice cue, สถิติ share image, แคลอรี่จาก HR
 งานต่อยอด: [watch-standalone.md](watch-standalone.md) (แอป Wear OS) ใช้โมเดล HR ชุดนี้
 
 ## เป้าหมาย

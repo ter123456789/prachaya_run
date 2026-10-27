@@ -22,6 +22,7 @@
 		97C147011CF9000F007C117D /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 97C146FF1CF9000F007C117D /* LaunchScreen.storyboard */; };
 		B95C1956913CEABE208FE638 /* Pods_Runner.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 32C41518F79A19B0843E616A /* Pods_Runner.framework */; };
 		D0257E813EF768CF515B8D92 /* LiveActivityBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3523F50210E75EED770E18F4 /* LiveActivityBridge.swift */; };
+		A1C3E5F70B2D4F6081A3C5E7 /* HeartRateBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2D4F6081A3C5E7092B4D6F8 /* HeartRateBridge.swift */; };
 		E198D6E021A63FD662998A56 /* RecordingLiveActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE010916E59A9DBD7E020AAF /* RecordingLiveActivity.swift */; };
 		E2809E2FE421694944BF7257 /* RecordingIntents.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7997D7E3C9832BF203546BA /* RecordingIntents.swift */; };
 		FBC2A6B17D583EC213CC08AD /* RecordingWidgetBundle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 643739E44709027A0FDD3426 /* RecordingWidgetBundle.swift */; };
@@ -79,6 +80,7 @@
 		331C807B294A618700263BE5 /* RunnerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RunnerTests.swift; sourceTree = "<group>"; };
 		331C8081294A63A400263BE5 /* RunnerTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = RunnerTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		3523F50210E75EED770E18F4 /* LiveActivityBridge.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LiveActivityBridge.swift; sourceTree = "<group>"; };
+		B2D4F6081A3C5E7092B4D6F8 /* HeartRateBridge.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HeartRateBridge.swift; sourceTree = "<group>"; };
 		3B3967151E833CAA004F5970 /* AppFrameworkInfo.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = AppFrameworkInfo.plist; path = Flutter/AppFrameworkInfo.plist; sourceTree = "<group>"; };
 		4F9A1C55153A820F22281EFF /* Pods-RunnerTests.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-RunnerTests.debug.xcconfig"; path = "Target Support Files/Pods-RunnerTests/Pods-RunnerTests.debug.xcconfig"; sourceTree = "<group>"; };
 		643739E44709027A0FDD3426 /* RecordingWidgetBundle.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RecordingWidgetBundle.swift; sourceTree = "<group>"; };
@@ -223,6 +225,7 @@
 				74858FAE1ED2DC5600515810 /* AppDelegate.swift */,
 				74858FAD1ED2DC5600515810 /* Runner-Bridging-Header.h */,
 				3523F50210E75EED770E18F4 /* LiveActivityBridge.swift */,
+				B2D4F6081A3C5E7092B4D6F8 /* HeartRateBridge.swift */,
 				0BCC5666181A413D2FB26E9D /* Runner.entitlements */,
 			);
 			path = Runner;
@@ -519,6 +522,7 @@
 				3DA0F868EC06B281BEB25B8F /* RecordingAttributes.swift in Sources */,
 				72E6A422CFA7A4AC57AD9593 /* RecordingIntents.swift in Sources */,
 				D0257E813EF768CF515B8D92 /* LiveActivityBridge.swift in Sources */,
+				A1C3E5F70B2D4F6081A3C5E7 /* HeartRateBridge.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
