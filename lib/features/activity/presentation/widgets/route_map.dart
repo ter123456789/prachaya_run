@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 
+import '../../../../core/map/carto_tiles.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../domain/entities/track_point.dart';
 
@@ -82,13 +83,7 @@ class _RouteMapState extends State<RouteMap> {
         onMapReady: () => _ready = true,
       ),
       children: [
-        TileLayer(
-          urlTemplate:
-              'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
-          subdomains: const ['a', 'b', 'c', 'd'],
-          retinaMode: RetinaMode.isHighDensity(context),
-          userAgentPackageName: 'com.example.prachaya_run',
-        ),
+        cartoDarkTileLayer(context),
         PolylineLayer(
           polylines: [
             for (final line in lines)

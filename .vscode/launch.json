@@ -1,0 +1,45 @@
+{
+  // API_BASE_URL is baked in at build time: after switching configs, stop and
+  // run again (hot restart keeps the old value).
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Prachaya Run (production API)",
+      "request": "launch",
+      "type": "dart",
+      "program": "lib/main.dart",
+      "args": ["--dart-define-from-file=dart_defines.prod.json"]
+    },
+    {
+      "name": "Prachaya Run (local API, iOS simulator)",
+      "request": "launch",
+      "type": "dart",
+      "program": "lib/main.dart",
+      "args": ["--dart-define=API_BASE_URL=http://localhost:3000"]
+    },
+    {
+      "name": "Prachaya Run (local API, Android emulator)",
+      "request": "launch",
+      "type": "dart",
+      "program": "lib/main.dart",
+      "args": ["--dart-define=API_BASE_URL=http://10.0.2.2:3000"]
+    },
+    {
+      // Real phone on the same Wi-Fi as the Mac. The Mac's IP changes per
+      // network: `ipconfig getifaddr en0`, then update it here.
+      "name": "Prachaya Run (local API, phone on Wi-Fi)",
+      "request": "launch",
+      "type": "dart",
+      "program": "lib/main.dart",
+      "args": ["--dart-define=API_BASE_URL=http://172.17.48.23:3000"]
+    },
+    {
+      "name": "Prachaya Run (production API, profile)",
+      "request": "launch",
+      "type": "dart",
+      "program": "lib/main.dart",
+      "flutterMode": "profile",
+      "args": ["--dart-define-from-file=dart_defines.prod.json"]
+    }
+  ]
+}

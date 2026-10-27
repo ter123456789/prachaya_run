@@ -181,7 +181,9 @@ Rules (enforced for every feature by `test/architecture_test.dart`):
   - `app_icon_foreground.png`: Android adaptive icon and Android 12 splash.
   - `logo.png`: squircle with the wordmark, on SplashPage.
   - Regenerate with `dart run flutter_launcher_icons` and `dart run flutter_native_splash:create`.
-- Maps use CARTO dark tiles (attribution: OpenStreetMap contributors, CARTO).
+- Maps use CARTO dark tiles (`core/map/carto_tiles.dart`; attribution: OpenStreetMap contributors, CARTO).
+  CARTO needs a key: `--dart-define=CARTO_API_KEY=...` (or in the git-ignored `dart_defines.prod.json`);
+  without one every tile reads "API KEY REQUIRED".
 
 ## State management
 - `flutter_bloc` + `equatable` for states. `RecordBloc` (events), `HistoryCubit`, `ActivityDetailCubit`,

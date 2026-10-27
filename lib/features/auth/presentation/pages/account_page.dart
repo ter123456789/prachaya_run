@@ -284,6 +284,11 @@ class _SignInFormState extends State<_SignInForm> {
           onPressed: busy ? null : _submit,
           child: AnimatedSwitcher(
             duration: const Duration(milliseconds: 200),
+            // Unkeyed transition: the default one copies the child's key, so a
+            // label coming back while its old copy still fades out (a submit
+            // that fails at once, quick tab taps) gives the Stack duplicate keys.
+            transitionBuilder: (child, a) =>
+                FadeTransition(opacity: a, child: child),
             child: busy
                 ? const SizedBox.square(
                     key: ValueKey('busy'),

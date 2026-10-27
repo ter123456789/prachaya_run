@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 
+import '../../../../core/map/carto_tiles.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_text.dart';
 import '../../../../core/widgets/circle_icon_button.dart';
@@ -234,13 +235,7 @@ class _DrawMapState extends State<_DrawMap> {
             ),
           ),
           children: [
-            TileLayer(
-              urlTemplate:
-                  'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
-              subdomains: const ['a', 'b', 'c', 'd'],
-              retinaMode: RetinaMode.isHighDensity(context),
-              userAgentPackageName: 'com.example.prachaya_run',
-            ),
+            cartoDarkTileLayer(context),
             PolylineLayer(
               polylines: [
                 // The drawing: solid while drawing, a faint guide once snapped.
