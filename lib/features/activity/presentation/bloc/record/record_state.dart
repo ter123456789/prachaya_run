@@ -31,6 +31,7 @@ final class RecordState extends Equatable {
     this.lapNumber = 1,
     this.lapStartMeters = 0,
     this.lapStartTime = Duration.zero,
+    this.inVehicle = false,
   });
 
   final ActivityType type;
@@ -53,6 +54,10 @@ final class RecordState extends Equatable {
   final int lapNumber;
   final double lapStartMeters;
   final Duration lapStartTime;
+
+  /// Paused by itself because the speed says a vehicle: GPS keeps
+  /// running and recording resumes once the athlete is out of it.
+  final bool inVehicle;
 
   double get lapDistanceMeters => distanceMeters - lapStartMeters;
   Duration get lapTime => movingTime - lapStartTime;
@@ -78,6 +83,7 @@ final class RecordState extends Equatable {
     int? lapNumber,
     double? lapStartMeters,
     Duration? lapStartTime,
+    bool? inVehicle,
   }) => RecordState(
     type: type ?? this.type,
     status: status ?? this.status,
@@ -91,6 +97,7 @@ final class RecordState extends Equatable {
     lapNumber: lapNumber ?? this.lapNumber,
     lapStartMeters: lapStartMeters ?? this.lapStartMeters,
     lapStartTime: lapStartTime ?? this.lapStartTime,
+    inVehicle: inVehicle ?? this.inVehicle,
   );
 
   @override
@@ -104,5 +111,6 @@ final class RecordState extends Equatable {
     failure,
     savedActivityId,
     lapNumber,
+    inVehicle,
   ];
 }

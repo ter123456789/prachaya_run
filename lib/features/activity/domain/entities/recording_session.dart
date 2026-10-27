@@ -26,9 +26,10 @@ class RecordingSession {
 
   final List<List<TrackPoint>> _segments = [<TrackPoint>[]];
   final List<LapMark> _laps = [];
-  final ElevationGainCounter _elevation = ElevationGainCounter();
+  ElevationGainCounter _elevation = ElevationGainCounter();
   Duration _accumulated = Duration.zero;
   DateTime? _runningSince;
+  DateTime? _pausedAt;
   double _distance = 0;
 
   bool get isPaused => _runningSince == null;
@@ -81,6 +82,22 @@ class RecordingSession {
     if (since == null) return;
     _accumulated += now.difference(since);
     _runningSince = null;
+    _pausedAt = now;
+  }
+
+  /// Pauses as if it had happened at [from] (when a vehicle ride began):
+  /// fixes after it are dropped and that stretch's distance and time no
+  /// longer count. Laps ended inside it are dropped too.
+  void pauseFrom(DateTime from, DateTime now) {
+    final since = _runningSince;
+    if (since == null) return;
+    final at = _clamp(from, since, now);
+    _segments.last.removeWhere((p) => p.timestamp.isAfter(at));
+    _recount();
+    pause(at);
+    _laps.removeWhere(
+      (lap) => lap.distanceMeters > _distance || lap.movingTime > _accumulated,
+    );
   }
 
   void resume(DateTime now) {
@@ -88,6 +105,31 @@ class RecordingSession {
     _runningSince = now;
     if (_segments.last.isNotEmpty) _segments.add(<TrackPoint>[]);
     _elevation.breakSegment();
+  }
+
+  /// Resumes as if it had happened at [from] (when the athlete left the
+  /// vehicle) and adds the [fixes] recorded since.
+  void resumeFrom(DateTime from, Iterable<TrackPoint> fixes, DateTime now) {
+    if (!isPaused) return;
+    resume(_clamp(from, _pausedAt ?? from, now));
+    for (final fix in fixes) {
+      if (!fix.timestamp.isBefore(from)) addPoint(fix);
+    }
+  }
+
+  static DateTime _clamp(DateTime t, DateTime min, DateTime max) =>
+      t.isBefore(min) ? min : (t.isAfter(max) ? max : t);
+
+  void _recount() {
+    _distance = 0;
+    _elevation = ElevationGainCounter();
+    for (final segment in _segments) {
+      for (var i = 0; i < segment.length; i++) {
+        if (i > 0) _distance += distanceBetween(segment[i - 1], segment[i]);
+        _elevation.add(segment[i].altitudeMeters);
+      }
+      _elevation.breakSegment();
+    }
   }
 
   Activity toActivity({

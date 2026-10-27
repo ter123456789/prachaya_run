@@ -167,6 +167,16 @@ Rules (enforced for every feature by `test/architecture_test.dart`):
       as `LiveCommand`.
   - **Android:** an ongoing notification with the same buttons (`AndroidRecordingNotification`).
   - **Laps:** live only (`RecordingSession.lap`, `RecordLapped`); activities and the API keep no laps.
+- Vehicle detection (`domain/services/vehicle_detector.dart`, GPS speed only, no motion permission):
+  - **Into a vehicle:** straight-line speed over 20 s ≥ 7 m/s (run/hike) or 20 m/s (ride), for 3 fixes
+    in a row. The recording pauses itself (`RecordState.inVehicle`, status `paused`, GPS keeps running).
+    `RecordingSession.pauseFrom` rewinds to the last slow step, dropping that distance, time and any laps.
+  - **Out of it:** below 5.5 / 14 m/s for 60 s. `resumeFrom` restarts from when the vehicle stopped and
+    back-fills the fixes since.
+  - **Override:** "ทำต่อ" (or the Live Activity's Resume) overrides it and resets the detector.
+  - **Cues and tests:** spoken and Live Activity cues come from `vehicleCueText`; km cues roll back after
+    a rewind. In the debug panel, pace "รถ 80" simulates a car.
+  - **Known limit:** a car crawling in traffic below 5.5 m/s for a minute counts as running again.
   Dashboard has a "ตารางซ้อม" teaser below the latest activity → SchedulePage.
 - Responsive (iPhone Duo foldable: outer ≈ 380 pt beside the camera strip, inner 669 × 951 pt):
   - Pages centre one column ≤ 640 pt (`ContentWidth` gutters keep the scroll view full width).

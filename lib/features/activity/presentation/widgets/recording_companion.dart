@@ -44,6 +44,7 @@ class _RecordingCompanionState extends State<RecordingCompanion> {
   LiveSnapshot? _shown;
   DateTime? _shownAt;
   bool _live = false;
+  bool _inVehicle = false;
 
   @override
   void initState() {
@@ -67,6 +68,7 @@ class _RecordingCompanionState extends State<RecordingCompanion> {
   void _onRecord(BuildContext context, RecordState state) {
     if (!state.isActive) {
       _cues = null;
+      _inVehicle = false;
       if (_live) {
         _live = false;
         _shown = null;
@@ -85,7 +87,12 @@ class _RecordingCompanionState extends State<RecordingCompanion> {
     final tracker = _cues ??= SplitCueTracker(units.unit.meters);
     final cue = tracker.update(state.distanceMeters, state.movingTime);
     final on = context.read<RemindersCubit>().state.settings.audioCues;
-    if (cue != null && on) {
+    final vehicleChanged = state.inVehicle != _inVehicle;
+    _inVehicle = state.inVehicle;
+    if (!on) return;
+    if (vehicleChanged) {
+      unawaited(voice.speak(vehicleCueText(state.inVehicle, state.type)));
+    } else if (cue != null) {
       unawaited(voice.speak(splitCueText(cue, units.unit, state.type)));
     }
   }

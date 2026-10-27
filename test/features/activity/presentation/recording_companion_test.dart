@@ -190,6 +190,30 @@ void main() {
     }
   });
 
+  testWidgets('says when a vehicle pauses the recording', (tester) async {
+    t = tester;
+    await pumpCompanion(tester);
+    {
+      bloc.add(const RecordStarted());
+      await settle();
+      for (final fix in journey([(30, 3.5), (30, 15)])) {
+        now = fix.timestamp;
+        tracker.emit(fix);
+        await settle();
+      }
+      expect(bloc.state.inVehicle, isTrue);
+      expect(voice.said.single, vehicleCueText(true, ActivityType.run));
+      expect(mirror.shown.last.paused, isTrue);
+      expect(mirror.shown.last.title, 'อยู่บนยานพาหนะ · หยุดนับระยะ');
+
+      mirror.press(LiveCommand.resume);
+      await settle();
+      expect(voice.said.last, 'กลับมาวิ่งแล้ว นับระยะต่อ');
+      bloc.add(const RecordReset());
+      await settle();
+    }
+  });
+
   testWidgets('voice cues off: silent', (tester) async {
     t = tester;
     await pumpCompanion(tester, audioCues: false);

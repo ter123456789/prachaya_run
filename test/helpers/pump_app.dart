@@ -17,6 +17,7 @@ class TestApp {
   final guest = FakeGuestData();
   final reminders = FakeReminderScheduler();
   final reminderSettings = InMemoryReminderSettings();
+  final tracker = FakeLocationTracker();
 
   /// Pumps the whole app on a phone-sized screen with reduced motion (so
   /// looping animations stop and pumpAndSettle ends).
@@ -42,7 +43,7 @@ class TestApp {
         guestData: guest,
         reminderScheduler: reminders,
         reminderSettings: reminderSettings,
-        locationTracker: FakeLocationTracker(),
+        locationTracker: tracker,
         photoSource: FakePhotoSource(),
         imageSink: FakeImageSink(),
       ),

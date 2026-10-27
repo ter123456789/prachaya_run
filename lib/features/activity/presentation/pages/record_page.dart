@@ -185,6 +185,10 @@ class _StatusRow extends StatelessWidget {
         'กำลังบันทึก${state.type.label}',
         AppColors.lime,
       ),
+      RecordStatus.paused when state.inVehicle => (
+        'อยู่บนยานพาหนะ',
+        AppColors.negative,
+      ),
       RecordStatus.paused => ('หยุดชั่วคราว', AppColors.negative),
       RecordStatus.saving ||
       RecordStatus.saved => ('กำลังบันทึกข้อมูล…', AppColors.mint),
@@ -309,8 +313,64 @@ class _TrackPanelState extends State<_TrackPanel> {
                   ),
                 ),
             ],
+            Positioned(
+              left: 12,
+              right: 12,
+              bottom: 12,
+              child: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 250),
+                child: state.inVehicle
+                    ? _VehicleNotice(state.type)
+                    : const SizedBox.shrink(),
+              ),
+            ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// Why the recording paused itself, over the track.
+class _VehicleNotice extends StatelessWidget {
+  const _VehicleNotice(this.type);
+
+  final ActivityType type;
+
+  @override
+  Widget build(BuildContext context) {
+    return GlassCard(
+      strong: true,
+      blur: true,
+      radius: 20,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      child: Row(
+        children: [
+          const Icon(
+            Icons.directions_car_rounded,
+            color: AppColors.negative,
+            size: 22,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  'ดูเหมือนคุณอยู่บนยานพาหนะ',
+                  style: AppText.headlineSm,
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'หยุดนับระยะไว้ จะนับต่อเองเมื่อลงจากรถ · '
+                  'ยัง${type.label}อยู่? กด "ทำต่อ"',
+                  style: AppText.caption,
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

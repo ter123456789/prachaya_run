@@ -30,12 +30,19 @@ String splitCueText(SplitCue cue, DistanceUnit unit, ActivityType type) {
   return '${cue.index} $name. เวลารวม ${spokenDuration(cue.totalTime)}. $pace';
 }
 
+/// Spoken when the recording pauses itself in a vehicle, or resumes after.
+String vehicleCueText(bool inVehicle, ActivityType type) => inVehicle
+    ? 'ดูเหมือนอยู่บนยานพาหนะ หยุดนับระยะชั่วคราว'
+    : 'กลับมา${type.label}แล้ว นับระยะต่อ';
+
 /// The Live Activity's view of [state].
 LiveSnapshot liveSnapshot(RecordState state, UnitFormat units, double? kg) {
   final speed = state.averageSpeedMps;
   final pace = state.type.usesPace;
   return LiveSnapshot(
-    title: 'กำลังบันทึก${state.type.label}',
+    title: state.inVehicle
+        ? 'อยู่บนยานพาหนะ · หยุดนับระยะ'
+        : 'กำลังบันทึก${state.type.label}',
     paused: state.status != RecordStatus.recording,
     elapsed: state.movingTime,
     distance: units.distance(state.distanceMeters),

@@ -82,4 +82,41 @@ void main() {
     expect(session.lap(t0.add(const Duration(minutes: 3))), isFalse);
     expect(session.lapNumber, 2);
   });
+
+  group('vehicle', () {
+    DateTime at(int second) => t0.add(Duration(seconds: second));
+
+    test('pauseFrom drops the ride and its time', () {
+      final session = newSession();
+      journey([(60, 3.5), (30, 15)]).forEach(session.addPoint);
+      session.pauseFrom(at(60), at(90));
+
+      expect(session.isPaused, isTrue);
+      expect(session.distanceMeters, closeTo(59 * 3.5, 0.5));
+      expect(session.movingTime(at(600)), const Duration(seconds: 60));
+      expect(session.segments.last.last.timestamp, at(60));
+    });
+
+    test('pauseFrom drops laps ended during the ride', () {
+      final session = newSession();
+      journey([(60, 3.5), (30, 15)]).forEach(session.addPoint);
+      expect(session.lap(at(80)), isTrue);
+      session.pauseFrom(at(60), at(90));
+      expect(session.laps, isEmpty);
+      expect(session.lapNumber, 1);
+    });
+
+    test('resumeFrom adds the fixes since getting out', () {
+      final session = newSession();
+      journey([(60, 3.5), (30, 15)]).forEach(session.addPoint);
+      session.pauseFrom(at(60), at(90));
+      final after = journey([(60, 3)], startSecond: 180, startMeters: 1000);
+      session.resumeFrom(at(180), after, at(240));
+
+      expect(session.isPaused, isFalse);
+      expect(session.segments, hasLength(2));
+      expect(session.distanceMeters, closeTo(59 * 3.5 + 59 * 3, 0.5));
+      expect(session.movingTime(at(240)), const Duration(minutes: 2));
+    });
+  });
 }

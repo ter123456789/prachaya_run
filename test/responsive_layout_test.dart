@@ -2,10 +2,13 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:prachaya_run/core/layout/content_width.dart';
 import 'package:prachaya_run/features/activity/presentation/pages/activity_detail_page.dart';
+import 'package:prachaya_run/features/activity/presentation/bloc/record/record_bloc.dart';
 import 'package:prachaya_run/features/activity/presentation/pages/home_page.dart';
+import 'package:prachaya_run/features/activity/presentation/pages/record_page.dart';
 import 'package:prachaya_run/features/athlete/presentation/pages/profile_page.dart';
 import 'package:prachaya_run/features/auth/presentation/pages/account_page.dart';
 import 'package:prachaya_run/features/photo_share/presentation/pages/photo_overlay_page.dart';
@@ -94,6 +97,23 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('บันทึกกิจกรรม'), findsOneWidget);
       expect(find.byTooltip('เริ่ม'), findsOneWidget);
+
+      // Recording paused by a car ride, with its notice over the track.
+      await tester.tap(find.byTooltip('เริ่ม'));
+      await tester.pumpAndSettle();
+      for (final fix in journey([(30, 3.5), (30, 15)])) {
+        app.tracker.emit(fix);
+      }
+      await tester.pumpAndSettle();
+      expect(find.text('ดูเหมือนคุณอยู่บนยานพาหนะ'), findsOneWidget);
+      expect(find.text('อยู่บนยานพาหนะ'), findsOneWidget);
+      tester
+          .element(find.byType(RecordPage))
+          .read<RecordBloc>()
+          .add(const RecordReset());
+      // The ticker's cancel completes on the real microtask queue.
+      await tester.runAsync(() => Future<void>.delayed(Duration.zero));
+      await tester.pumpAndSettle();
     });
   }
 }

@@ -112,7 +112,7 @@ class _Label extends StatelessWidget {
 class _GpsSection extends StatelessWidget {
   const _GpsSection();
 
-  static const _paces = [240, 330, 420, 120];
+  static const _paces = [240, 330, 420, 120, 45];
 
   @override
   Widget build(BuildContext context) {
@@ -146,9 +146,11 @@ class _GpsSection extends StatelessWidget {
               ? gps.paceSecondsPerKm
               : _paces[1],
           onChanged: (p) => set(gps.copyWith(paceSecondsPerKm: p)),
-          labelOf: (p) => p == 120
-              ? 'ปั่น 30'
-              : '${p ~/ 60}:${(p % 60).toString().padLeft(2, '0')}',
+          labelOf: (p) => switch (p) {
+            120 => 'ปั่น 30',
+            45 => 'รถ 80',
+            _ => '${p ~/ 60}:${(p % 60).toString().padLeft(2, '0')}',
+          },
         ),
         const _Label('เร่งเวลา (นาฬิกาแอปเร่งตามด้วย)'),
         PillTabs<int>(

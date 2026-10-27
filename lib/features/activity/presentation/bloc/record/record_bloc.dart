@@ -7,6 +7,7 @@ import '../../../domain/entities/activity_type.dart';
 import '../../../domain/entities/recording_session.dart';
 import '../../../domain/entities/track_point.dart';
 import '../../../domain/services/location_tracker.dart';
+import '../../../domain/services/vehicle_detector.dart';
 import '../../../domain/usecases/save_activity.dart';
 import '../../activity_labels.dart';
 
@@ -41,6 +42,7 @@ class RecordBloc extends Bloc<RecordEvent, RecordState> {
   final Duration tickInterval;
 
   RecordingSession? _session;
+  VehicleDetector? _vehicle;
   StreamSubscription<TrackPoint>? _locationSub;
   StreamSubscription<void>? _tickerSub;
 
@@ -62,14 +64,40 @@ class RecordBloc extends Bloc<RecordEvent, RecordState> {
       return;
     }
     _session = RecordingSession(type: state.type, startedAt: _clock());
+    _vehicle = VehicleDetector(VehicleThresholds.forType(state.type));
     _startStreams();
     emit(RecordState(type: state.type, status: RecordStatus.recording));
   }
 
   void _onLocationReceived(_LocationReceived event, Emitter<RecordState> emit) {
     final session = _session;
-    if (session == null || !session.addPoint(event.point)) return;
-    emit(_snapshot(session, state.status));
+    if (session == null) return;
+    final change = _vehicle?.add(event.point);
+    if (change != null) {
+      _onVehicleChanged(session, change, emit);
+    } else if (session.addPoint(event.point)) {
+      emit(_snapshot(session, state.status));
+    }
+  }
+
+  /// In a vehicle the recording pauses itself, back to when the ride
+  /// began; out of it, it resumes from when the athlete got out.
+  void _onVehicleChanged(
+    RecordingSession session,
+    VehicleChange change,
+    Emitter<RecordState> emit,
+  ) {
+    final now = _clock();
+    if (change.inVehicle) {
+      if (state.status != RecordStatus.recording) return;
+      session.pauseFrom(change.since, now);
+      emit(_withLaps(session, RecordStatus.paused, inVehicle: true));
+    } else {
+      if (!state.inVehicle) return;
+      final fixes = _vehicle!.fixesSince(change.since);
+      session.resumeFrom(change.since, fixes, now);
+      emit(_withLaps(session, RecordStatus.recording, inVehicle: false));
+    }
   }
 
   void _onTicked(_Ticked event, Emitter<RecordState> emit) {
@@ -90,8 +118,10 @@ class RecordBloc extends Bloc<RecordEvent, RecordState> {
     final session = _session;
     if (session == null || state.status != RecordStatus.paused) return;
     session.resume(_clock());
-    _startStreams();
-    emit(_snapshot(session, RecordStatus.recording));
+    // After a manual pause, or "not in a vehicle": judge the speed afresh.
+    _vehicle?.reset();
+    if (_locationSub == null) _startStreams();
+    emit(_snapshot(session, RecordStatus.recording, inVehicle: false));
   }
 
   void _onLapped(RecordLapped event, Emitter<RecordState> emit) {
@@ -126,6 +156,7 @@ class RecordBloc extends Bloc<RecordEvent, RecordState> {
         endedAt: now,
       );
       _session = null;
+      _vehicle = null;
       emit(
         state.copyWith(
           status: RecordStatus.saved,
@@ -136,6 +167,7 @@ class RecordBloc extends Bloc<RecordEvent, RecordState> {
       emit(
         state.copyWith(
           status: RecordStatus.paused,
+          inVehicle: false,
           failure: RecordFailure.tooShort,
         ),
       );
@@ -143,6 +175,7 @@ class RecordBloc extends Bloc<RecordEvent, RecordState> {
       emit(
         state.copyWith(
           status: RecordStatus.paused,
+          inVehicle: false,
           failure: RecordFailure.saveFailed,
         ),
       );
@@ -152,6 +185,7 @@ class RecordBloc extends Bloc<RecordEvent, RecordState> {
   Future<void> _onReset(RecordReset event, Emitter<RecordState> emit) async {
     await _stopStreams();
     _session = null;
+    _vehicle = null;
     emit(RecordState(type: state.type));
   }
 
@@ -160,25 +194,47 @@ class RecordBloc extends Bloc<RecordEvent, RecordState> {
     Emitter<RecordState> emit,
   ) async {
     final session = _session;
-    if (session == null || state.status != RecordStatus.recording) return;
+    final watching = state.status == RecordStatus.recording || state.inVehicle;
+    if (session == null || !watching) return;
     session.pause(_clock());
     await _stopStreams();
     emit(
       _snapshot(
         session,
         RecordStatus.paused,
+        inVehicle: false,
       ).copyWith(failure: RecordFailure.locationLost),
     );
   }
 
-  RecordState _snapshot(RecordingSession session, RecordStatus status) {
+  RecordState _snapshot(
+    RecordingSession session,
+    RecordStatus status, {
+    bool? inVehicle,
+  }) {
     return state.copyWith(
       status: status,
+      inVehicle: inVehicle,
       segments: session.segments,
       revision: state.revision + 1,
       distanceMeters: session.distanceMeters,
       elevationGainMeters: session.elevationGainMeters,
       movingTime: session.movingTime(_clock()),
+    );
+  }
+
+  /// A snapshot that also re-reads the laps (a vehicle rewind can drop
+  /// some).
+  RecordState _withLaps(
+    RecordingSession session,
+    RecordStatus status, {
+    required bool inVehicle,
+  }) {
+    final last = session.laps.isEmpty ? null : session.laps.last;
+    return _snapshot(session, status, inVehicle: inVehicle).copyWith(
+      lapNumber: session.lapNumber,
+      lapStartMeters: last?.distanceMeters ?? 0,
+      lapStartTime: last?.movingTime ?? Duration.zero,
     );
   }
 

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 import 'dart:typed_data';
 
 import 'package:prachaya_run/features/activity/domain/entities/activity.dart';
@@ -52,6 +53,35 @@ TrackPoint pointAt(
   altitudeMeters: altitude,
   accuracyMeters: accuracy,
 );
+
+/// One fix per second, heading north from [pointAt]'s start, through legs
+/// of (seconds, m/s): `journey([(60, 3.5), (120, 15)])` runs a minute then
+/// rides a car for two. [startSecond] continues an earlier journey.
+List<TrackPoint> journey(
+  List<(int, double)> legs, {
+  int startSecond = 0,
+  double startMeters = 0,
+}) {
+  const metersPerDegree = 6371000 * math.pi / 180;
+  final fixes = <TrackPoint>[];
+  var second = startSecond;
+  var meters = startMeters;
+  for (final (seconds, mps) in legs) {
+    for (var i = 0; i < seconds; i++) {
+      second++;
+      meters += mps;
+      fixes.add(
+        TrackPoint(
+          latitude: 13.7 + meters / metersPerDegree,
+          longitude: 100.5,
+          timestamp: t0.add(Duration(seconds: second)),
+          accuracyMeters: 5,
+        ),
+      );
+    }
+  }
+  return fixes;
+}
 
 class FakeLocationTracker implements LocationTracker {
   FakeLocationTracker({this.access = LocationAccess.granted});

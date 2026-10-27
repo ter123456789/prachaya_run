@@ -23,4 +23,13 @@ void main() {
     expect(cue.splitTime, const Duration(minutes: 10));
     expect(cues.update(3301, const Duration(minutes: 20)), isNull);
   });
+
+  test('a unit taken back by a vehicle rewind is announced again', () {
+    final cues = SplitCueTracker(1000);
+    expect(cues.update(1050, const Duration(minutes: 5))!.index, 1);
+    expect(cues.update(980, const Duration(minutes: 5)), isNull);
+    final again = cues.update(1010, const Duration(minutes: 6))!;
+    expect(again.index, 1);
+    expect(again.splitTime, const Duration(minutes: 6));
+  });
 }
