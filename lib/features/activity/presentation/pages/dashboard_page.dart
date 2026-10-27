@@ -32,6 +32,9 @@ import '../activity_labels.dart';
 import '../activity_refresh.dart';
 import '../bloc/dashboard/dashboard_cubit.dart';
 import '../bloc/record/record_bloc.dart';
+import '../bloc/health_import/health_import_cubit.dart';
+import '../widgets/no_route.dart';
+import '../widgets/origin_tag.dart';
 import '../widgets/route_canvas.dart';
 import 'activity_detail_page.dart';
 
@@ -77,6 +80,7 @@ class DashboardPage extends StatelessWidget {
                     const SizedBox(height: 12),
                     FadeSlideIn(child: _Greeting(now: now)),
                     _RecordingBanner(onTap: onStart),
+                    _ImportBanner(onTap: onSeeAll),
                     const SizedBox(height: 24),
                   ],
                   start: [
@@ -262,6 +266,50 @@ class _RecordingBanner extends StatelessWidget {
                 ),
         );
       },
+    );
+  }
+}
+
+/// "นำเข้ากิจกรรมใหม่จากนาฬิกา 2 รายการ" after an import; tap → history.
+class _ImportBanner extends StatelessWidget {
+  const _ImportBanner({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final count = context.select(
+      (HealthImportCubit c) => c.state.newActivities,
+    );
+    return AnimatedSize(
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeOutCubic,
+      child: count == 0
+          ? const SizedBox(width: double.infinity)
+          : Padding(
+              padding: const EdgeInsets.only(top: 16),
+              child: GlassCard(
+                strong: true,
+                onTap: () {
+                  context.read<HealthImportCubit>().acknowledge();
+                  onTap();
+                },
+                child: Row(
+                  children: [
+                    const Icon(Icons.watch_outlined, color: AppColors.lime),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text('นำเข้ากิจกรรมใหม่จากนาฬิกา $count รายการ'),
+                    ),
+                    IconButton(
+                      tooltip: 'ปิด',
+                      icon: const Icon(Icons.close_rounded, size: 18),
+                      onPressed: context.read<HealthImportCubit>().acknowledge,
+                    ),
+                  ],
+                ),
+              ),
+            ),
     );
   }
 }
@@ -530,10 +578,12 @@ class _LatestActivity extends StatelessWidget {
                   // Keep the route clear of the badge row on top.
                   Positioned.fill(
                     top: 44,
-                    child: RouteCanvas(
-                      shape: RouteShape.fromSegments(a.segments),
-                      padding: 0.1,
-                    ),
+                    child: a.hasTrack
+                        ? RouteCanvas(
+                            shape: RouteShape.fromSegments(a.segments),
+                            padding: 0.1,
+                          )
+                        : const NoRoute(),
                   ),
                   Positioned(
                     left: 12,
@@ -543,6 +593,16 @@ class _LatestActivity extends StatelessWidget {
                       dotColor: AppColors.mint,
                     ),
                   ),
+                  if (a.origin.label case final from?)
+                    Positioned(
+                      left: 12,
+                      right: 12,
+                      bottom: 12,
+                      child: Align(
+                        alignment: Alignment.centerLeft,
+                        child: OriginTag(from),
+                      ),
+                    ),
                   Positioned(
                     right: 12,
                     top: 12,
@@ -586,7 +646,7 @@ class _LatestActivity extends StatelessWidget {
                         children: [
                           Flexible(
                             child: Text(
-                              a.title,
+                              activityTitle(a.title, a.type, a.startedAt),
                               style: AppText.headlineSm,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
@@ -594,7 +654,7 @@ class _LatestActivity extends StatelessWidget {
                           ),
                           if (effort != null) ...[
                             const SizedBox(width: 8),
-                            _Tag(effort.tag(a.type)),
+                            Flexible(child: _Tag(effort.tag(a.type))),
                           ],
                         ],
                       ),
@@ -664,6 +724,8 @@ class _Tag extends StatelessWidget {
     ),
     child: Text(
       text,
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
       style: AppText.monoLabel.copyWith(color: AppColors.secondary),
     ),
   );

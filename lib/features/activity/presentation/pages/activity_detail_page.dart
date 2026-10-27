@@ -38,6 +38,8 @@ import '../activity_labels.dart';
 import '../activity_refresh.dart';
 import '../bloc/detail/activity_detail_cubit.dart';
 import '../widgets/heart_rate_card.dart';
+import '../widgets/no_route.dart';
+import '../widgets/origin_tag.dart';
 import '../widgets/route_map.dart';
 
 class ActivityDetailPage extends StatelessWidget {
@@ -181,7 +183,16 @@ class _Body extends StatelessWidget {
                 color: AppColors.lime,
                 mono: true,
               ),
-              const Spacer(),
+              if (activity.origin.label case final from?) ...[
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: OriginTag(from),
+                  ),
+                ),
+              ] else
+                const Spacer(),
               CircleIconButton(
                 icon: Icons.ios_share_rounded,
                 tooltip: 'แชร์',
@@ -204,7 +215,11 @@ class _Body extends StatelessWidget {
         const SizedBox(height: 14),
       ],
       start: [
-        stagger(_MapCard(activity: activity, insights: insights)),
+        stagger(
+          activity.hasTrack
+              ? _MapCard(activity: activity, insights: insights)
+              : _NoRouteCard(activity),
+        ),
         const SizedBox(height: 20),
         stagger(_TitleBlock(activity: activity, weather: state.weather)),
         const SizedBox(height: 16),
@@ -293,6 +308,39 @@ class _Body extends StatelessWidget {
       ),
     );
     if (confirmed ?? false) await cubit.delete();
+  }
+}
+
+/// An activity imported without a GPS track: what the watch reported.
+class _NoRouteCard extends StatelessWidget {
+  const _NoRouteCard(this.activity);
+
+  final Activity activity;
+
+  @override
+  Widget build(BuildContext context) {
+    final device = activity.origin.device;
+    return GlassCard(
+      radius: 28,
+      padding: const EdgeInsets.fromLTRB(16, 20, 16, 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const SizedBox(height: 110, child: NoRoute()),
+          Text(
+            device == null
+                ? 'ระยะทางตามที่นาฬิกาบันทึก'
+                : 'ระยะทางตามที่ $device บันทึก',
+            style: AppText.caption,
+          ),
+          Text(
+            '${context.units.distance(activity.distanceMeters)} '
+            '${context.units.unit.english}',
+            style: AppText.metricSm.copyWith(color: AppColors.lime),
+          ),
+        ],
+      ),
+    );
   }
 }
 
@@ -400,7 +448,16 @@ class _TitleBlock extends StatelessWidget {
               color: AppColors.lime,
             ),
             const SizedBox(width: 10),
-            Expanded(child: Text(activity.title, style: AppText.headlineMd)),
+            Expanded(
+              child: Text(
+                activityTitle(
+                  activity.title,
+                  activity.type,
+                  activity.startedAt,
+                ),
+                style: AppText.headlineMd,
+              ),
+            ),
           ],
         ),
         const SizedBox(height: 4),

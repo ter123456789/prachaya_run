@@ -7,6 +7,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:prachaya_run/core/layout/content_width.dart';
 import 'package:prachaya_run/features/activity/presentation/pages/activity_detail_page.dart';
 import 'package:prachaya_run/features/activity/domain/entities/activity.dart';
+import 'package:prachaya_run/features/activity/domain/entities/activity_origin.dart';
+import 'package:prachaya_run/features/activity/domain/entities/activity_type.dart';
 import 'package:prachaya_run/features/activity/domain/services/heart_rate_monitor.dart';
 import 'package:prachaya_run/features/activity/presentation/bloc/heart_rate/heart_rate_cubit.dart';
 import 'package:prachaya_run/features/activity/presentation/bloc/record/record_bloc.dart';
@@ -66,6 +68,23 @@ void main() {
         heartRate: sampleHeartRate(),
       );
       app.activities.store[activity.id] = activity;
+      // From a watch, without a GPS track.
+      final watchRun = Activity(
+        id: 'watch',
+        type: ActivityType.run,
+        title: '',
+        startedAt: sample.startedAt.subtract(const Duration(days: 1)),
+        endedAt: sample.endedAt.subtract(const Duration(days: 1)),
+        movingTime: sample.movingTime,
+        segments: const [],
+        origin: const ActivityOrigin(
+          OriginKind.health,
+          app: 'Samsung Health',
+          device: 'Galaxy Watch7 Ultra LTE',
+        ),
+        reportedDistanceMeters: 5000,
+      );
+      app.activities.store[watchRun.id] = watchRun;
       const route = PlannedRoute(
         id: 'r1',
         name: 'หัวใจรอบสวนลุมพินี วนสองรอบแล้วกลับบ้าน',
@@ -93,6 +112,8 @@ void main() {
       final navigator = Navigator.of(tester.element(find.byType(HomePage)));
       for (final route in [
         ActivityDetailPage.route(activity.id),
+        ActivityDetailPage.route(watchRun.id),
+        PhotoOverlayPage.route(watchRun),
         ProfilePage.route(),
         SchedulePage.route(),
         AccountPage.route(),

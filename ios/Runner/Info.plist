@@ -26,8 +26,23 @@
 		<string>$(FLUTTER_BUILD_NUMBER)</string>
 		<key>LSRequiresIPhoneOS</key>
 		<true/>
+		<key>CFBundleURLTypes</key>
+		<array>
+			<dict>
+				<key>CFBundleURLName</key>
+				<string>links</string>
+				<key>CFBundleURLSchemes</key>
+				<array>
+					<string>prachayarun</string>
+				</array>
+			</dict>
+		</array>
+		<key>FlutterDeepLinkingEnabled</key>
+		<false/>
 		<key>NSBluetoothAlwaysUsageDescription</key>
 		<string>ใช้บลูทูธเชื่อมต่อสายคาดอกหรือนาฬิกา เพื่อแสดงและบันทึกอัตราการเต้นหัวใจระหว่างออกกำลังกาย</string>
+		<key>NSHealthShareUsageDescription</key>
+		<string>อ่านกิจกรรมที่บันทึกด้วยนาฬิกา (เช่น Apple Watch, Garmin) พร้อมเส้นทางและอัตราการเต้นหัวใจ เพื่อนำเข้ามาในแอป</string>
 		<key>NSCameraUsageDescription</key>
 		<string>ถ่ายรูปเพื่อใส่เส้นทางและสถิติการวิ่ง</string>
 		<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>

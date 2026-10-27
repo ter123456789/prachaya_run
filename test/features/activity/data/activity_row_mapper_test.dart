@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:prachaya_run/features/activity/data/models/activity_row_mapper.dart';
 import 'package:prachaya_run/features/activity/domain/entities/activity.dart';
+import 'package:prachaya_run/features/activity/domain/entities/activity_origin.dart';
 import 'package:prachaya_run/features/activity/domain/entities/activity_type.dart';
 
 import '../../../helpers/fakes.dart';
@@ -64,5 +65,42 @@ void main() {
     );
     expect(restored.heartRate, sampleHeartRate());
     expect(ActivityRowMapper.heartRateToColumn(sampleActivity()), isNull);
+  });
+
+  test('origin and a no-track distance survive the row', () {
+    final a = Activity(
+      id: 'a',
+      type: ActivityType.ride,
+      title: 'ปั่นในร่ม',
+      startedAt: t0,
+      endedAt: t0.add(const Duration(hours: 1)),
+      movingTime: const Duration(hours: 1),
+      segments: const [],
+      origin: const ActivityOrigin(OriginKind.health, device: 'Watch'),
+      reportedDistanceMeters: 21000,
+      reportedElevationGainMeters: 120,
+    );
+    final row = ActivityRowMapper.activityToRow(
+      a,
+      updatedAt: t0,
+      ownerId: null,
+    );
+    final back = ActivityRowMapper.activityFromRows(row, const []);
+    expect(back.origin, a.origin);
+    expect(back.distanceMeters, 21000);
+    expect(back.elevationGainMeters, 120);
+    final summary = ActivityRowMapper.summaryFromRow(row);
+    expect(summary.origin, a.origin);
+    expect(summary.end, a.endedAt);
+    expect(
+      ActivityRowMapper.summaryFromRow(
+        ActivityRowMapper.activityToRow(
+          sampleActivity(),
+          updatedAt: t0,
+          ownerId: null,
+        ),
+      ).origin,
+      ActivityOrigin.phone,
+    );
   });
 }

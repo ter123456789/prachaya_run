@@ -18,7 +18,9 @@ import '../../../../core/widgets/pill_tabs.dart';
 import '../../../../core/widgets/pressable.dart';
 import '../../../../core/widgets/status_pill.dart';
 import '../../../activity/domain/services/activity_sync.dart';
+import '../../../activity/domain/services/health_source.dart';
 import '../../../activity/domain/services/heart_rate_monitor.dart';
+import '../../../activity/presentation/bloc/health_import/health_import_cubit.dart';
 import '../../../activity/presentation/bloc/heart_rate/heart_rate_cubit.dart';
 import '../../../activity/presentation/bloc/history/history_cubit.dart';
 import '../../../activity/presentation/widgets/heart_rate_sensor_sheet.dart';
@@ -28,6 +30,7 @@ import '../../../auth/presentation/bloc/auth_cubit.dart';
 import '../../../auth/presentation/bloc/profile_cubit.dart';
 import '../../../auth/presentation/pages/account_page.dart';
 import '../../../auth/presentation/widgets/guest_widgets.dart';
+import '../../../auth/presentation/widgets/linked_accounts_card.dart';
 import '../../../activity/domain/entities/weekly_stats.dart';
 import '../../../reminders/domain/entities/reminder_settings.dart';
 import '../../../reminders/presentation/bloc/reminders_cubit.dart';
@@ -193,6 +196,7 @@ class _ProfilePageState extends State<ProfilePage> {
                   const SizedBox(height: 16),
                   stagger(const _GearCard()),
                   const SizedBox(height: 16),
+                  if (signedIn) stagger(const LinkedAccountsCard()),
                   stagger(const _SettingsCard()),
                   if (!signedIn) ...[
                     const SizedBox(height: 20),
@@ -800,6 +804,7 @@ class _SettingsCard extends StatelessWidget {
           const SectionHeader('การตั้งค่า', icon: Icons.settings_outlined),
           const SizedBox(height: 6),
           const _SensorRow(),
+          const _HealthImportRow(),
           _SettingRow(
             icon: Icons.straighten_rounded,
             title: 'หน่วยวัดระยะทาง',
@@ -921,6 +926,105 @@ class _SensorRow extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Workouts recorded by watch apps (Samsung Health, Garmin Connect, Apple
+/// Workout…) come in from Apple Health / Health Connect.
+class _HealthImportRow extends StatelessWidget {
+  const _HealthImportRow();
+
+  static String _store(BuildContext context) =>
+      Theme.of(context).platform == TargetPlatform.iOS
+      ? 'Apple Health'
+      : 'Health Connect';
+
+  @override
+  Widget build(BuildContext context) {
+    final state = context.watch<HealthImportCubit>().state;
+    if (!state.available) return const SizedBox.shrink();
+    final store = _store(context);
+    final last = state.lastImportAt;
+    final String subtitle;
+    if (!state.enabled) {
+      subtitle = state.access == HealthAccess.needsUpdate
+          ? 'ติดตั้งหรืออัปเดต Health Connect ก่อน'
+          : state.failed
+          ? 'ไม่ได้รับสิทธิ์อ่านข้อมูล อนุญาตได้ใน $store'
+          : 'Samsung Health, Garmin Connect, Apple Watch ฯลฯ ผ่าน $store';
+    } else if (state.importing) {
+      subtitle = '$store · กำลังนำเข้า…';
+    } else if (state.failed) {
+      subtitle = '$store · นำเข้าไม่สำเร็จ ลองอีกครั้ง';
+    } else if (last == null) {
+      subtitle = store;
+    } else {
+      final count = state.lastImported > 0
+          ? ' · ${state.lastImported} กิจกรรม'
+          : '';
+      subtitle =
+          '$store · ล่าสุด ${formatRelative(last, DateTime.now())}$count';
+    }
+    final cubit = context.read<HealthImportCubit>();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _SettingRow(
+          icon: Icons.watch_outlined,
+          title: 'นำเข้ากิจกรรมจากนาฬิกา',
+          subtitle: subtitle,
+          trailing: Switch(
+            value: state.enabled,
+            onChanged: (on) async {
+              if (!on) return cubit.disable();
+              final days = await _askRange(context, store);
+              if (days != null) await cubit.enable(daysBack: days);
+            },
+          ),
+        ),
+        if (state.enabled)
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Padding(
+              padding: const EdgeInsets.only(left: 28),
+              child: TextButton.icon(
+                onPressed: state.importing ? null : cubit.importNow,
+                icon: const Icon(Icons.sync_rounded, size: 18),
+                label: const Text('นำเข้าตอนนี้'),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  /// How far back the first import reaches.
+  static Future<int?> _askRange(BuildContext context, String store) =>
+      showDialog<int>(
+        context: context,
+        builder: (context) => AlertDialog(
+          icon: const Icon(Icons.watch_outlined, color: AppColors.lime),
+          title: const Text('นำเข้ากิจกรรมจากนาฬิกา'),
+          content: Text(
+            'แอปจะอ่านการวิ่ง ปั่น และเดินป่าที่นาฬิกาบันทึกไว้ใน $store '
+            'พร้อมเส้นทางและชีพจร (ถ้ามี) แล้วนำเข้าให้เองทุกครั้งที่เปิดแอป',
+            style: AppText.body,
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('ยกเลิก'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context, 0),
+              child: const Text('ตั้งแต่วันนี้'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context, 30),
+              child: const Text('ย้อนหลัง 30 วัน'),
+            ),
+          ],
+        ),
+      );
 }
 
 class _SettingRow extends StatelessWidget {

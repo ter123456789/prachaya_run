@@ -26,6 +26,7 @@ import '../activity_labels.dart';
 import '../activity_refresh.dart';
 import '../bloc/history/history_cubit.dart';
 import '../bloc/sync/sync_cubit.dart';
+import '../widgets/origin_tag.dart';
 import 'activity_detail_page.dart';
 
 class HistoryPage extends StatelessWidget {
@@ -338,7 +339,11 @@ class _ActivityCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      summary.title,
+                      activityTitle(
+                        summary.title,
+                        summary.type,
+                        summary.startedAt,
+                      ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: AppText.headlineSm,
@@ -359,6 +364,10 @@ class _ActivityCard extends StatelessWidget {
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
+                        if (summary.origin.label case final from?) ...[
+                          const SizedBox(width: 8),
+                          Flexible(child: OriginTag(from)),
+                        ],
                       ],
                     ),
                   ],

@@ -26,7 +26,8 @@ android {
         applicationId = "com.example.prachaya_run"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
-        minSdk = flutter.minSdkVersion
+        // Health Connect's client library needs Android 8.0 (API 26).
+        minSdk = maxOf(flutter.minSdkVersion, 26)
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
@@ -47,4 +48,6 @@ flutter {
 
 dependencies {
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
+    // Health Connect (HealthBridge.kt): import workouts from watch apps.
+    implementation("androidx.health.connect:connect-client:1.1.0")
 }

@@ -1,6 +1,6 @@
 # นำเข้ากิจกรรมจากนาฬิกา ผ่าน Health Connect / Apple Health
 
-สถานะ: **สเปก ยังไม่ได้ลงมือ** — คุยไว้ 2026-10-27
+สถานะ: **ทำแล้ว 2026-10-27** (แอป + API v1.6) — ต้องเปิด HealthKit capability ก่อนใช้บน iOS; ทดสอบกับนาฬิกาจริงยังไม่ได้ทำ
 รวมเฟส 2 ของ [ble-heart-rate.md](ble-heart-rate.md) (ดึง HR ย้อนหลัง) ไว้ในงานนี้
 งานคู่กัน: [watch-account-link.md](watch-account-link.md) (เชื่อมบัญชีแบรนด์ฝั่งเซิร์ฟเวอร์)
 
@@ -87,6 +87,13 @@ running / treadmill → `run`, cycling / biking → `ride`, hiking / walking →
   เฉพาะกรณีนั้น (มี segments เมื่อไร เซิร์ฟเวอร์คำนวณเองเหมือนเดิม)
 - แอป: `Activity` เพิ่ม `origin` + ระยะ/ความสูงที่ให้มา (ใช้เมื่อไม่มี track); DB v7: `activities.origin` (JSON),
   `distance_m` / `elevation_gain_m` มีอยู่แล้ว
+
+## ต่างจากสเปกตอนลงมือ
+- ไม่ใช้ anchor / Changes API: อ่านตามช่วงเวลา (ตั้งแต่รอบที่แล้ว − 7 วัน) แล้วกันซ้ำด้วย id คงที่ + รายการ `seen`
+  ทำให้แอปขอรายละเอียด (เส้นทาง + HR) เฉพาะ workout ใหม่ และไม่ต้องจัดการ token หมดอายุ
+- ไม่มี background delivery บน iOS (ต้องใช้ entitlement เพิ่ม) — นำเข้าตอนเปิด / กลับเข้าแอปแทน
+- เส้นทางจาก Health Connect ที่ต้องขอ consent รายครั้ง → นำเข้าแบบไม่มีเส้นทางไปก่อน
+- ID ของ Health Connect ใช้ `metadata.id`; HealthKit ใช้ `HKWorkout.uuid`
 
 ## ไม่ทำในงานนี้
 - เขียนกิจกรรมของแอปเราลง Health (ทำทีหลังได้ — กรองของตัวเองไว้แล้ว)

@@ -6,32 +6,42 @@ import 'core/theme/app_theme.dart';
 import 'features/activity/domain/repositories/activity_photo_repository.dart';
 import 'features/activity/domain/repositories/activity_repository.dart';
 import 'features/activity/domain/repositories/challenge_repository.dart';
+import 'features/activity/domain/repositories/health_import_store.dart';
 import 'features/activity/domain/entities/activity_type.dart';
 import 'features/activity/domain/services/activity_sync.dart';
+import 'features/activity/domain/services/health_source.dart';
 import 'features/activity/domain/services/heart_rate_monitor.dart';
 import 'features/activity/domain/services/location_tracker.dart';
 import 'features/activity/domain/services/recording_mirror.dart';
 import 'features/activity/domain/services/voice_coach.dart';
 import 'features/activity/domain/services/weather_service.dart';
+import 'features/activity/domain/usecases/import_activities.dart';
 import 'features/activity/domain/usecases/save_activity.dart';
+import 'features/activity/presentation/activity_labels.dart';
 import 'features/activity/presentation/activity_refresh.dart';
 import 'features/activity/presentation/bloc/dashboard/dashboard_cubit.dart';
+import 'features/activity/presentation/bloc/health_import/health_import_cubit.dart';
 import 'features/activity/presentation/bloc/heart_rate/heart_rate_cubit.dart';
 import 'features/activity/presentation/bloc/history/history_cubit.dart';
 import 'features/activity/presentation/bloc/record/record_bloc.dart';
 import 'features/activity/presentation/bloc/sync/sync_cubit.dart';
 import 'features/activity/presentation/pages/home_page.dart';
+import 'features/activity/presentation/widgets/health_import_listener.dart';
 import 'features/activity/presentation/widgets/recording_companion.dart';
 import 'features/athlete/domain/repositories/settings_repository.dart';
 import 'features/athlete/domain/repositories/shoe_repository.dart';
 import 'features/athlete/presentation/bloc/gear_cubit.dart';
 import 'features/athlete/presentation/bloc/units_cubit.dart';
+import 'features/auth/domain/repositories/account_link_repository.dart';
 import 'features/auth/domain/repositories/auth_repository.dart';
 import 'features/auth/domain/repositories/guest_data_repository.dart';
 import 'features/auth/domain/repositories/profile_repository.dart';
+import 'features/auth/domain/services/external_browser.dart';
 import 'features/auth/presentation/bloc/auth_cubit.dart';
+import 'features/auth/presentation/bloc/linked_accounts_cubit.dart';
 import 'features/auth/presentation/bloc/profile_cubit.dart';
 import 'features/auth/presentation/widgets/guest_link_sheet.dart';
+import 'features/auth/presentation/widgets/linked_accounts_listener.dart';
 import 'features/debug/domain/services/debug_tools.dart';
 import 'features/debug/presentation/debug_cubit.dart';
 import 'features/debug/presentation/debug_overlay.dart';
@@ -71,6 +81,10 @@ class PrachayaRunApp extends StatelessWidget {
     this.weatherService,
     required this.locationTracker,
     this.heartRateMonitor,
+    this.healthSource,
+    this.healthImportStore,
+    this.accountLinks,
+    this.browser,
     required this.photoSource,
     required this.imageSink,
     this.debugTools,
@@ -106,6 +120,14 @@ class PrachayaRunApp extends StatelessWidget {
 
   /// Bluetooth heart-rate sensor; none in tests.
   final HeartRateMonitor? heartRateMonitor;
+
+  /// Apple Health / Health Connect and the import settings; none in tests.
+  final HealthSource? healthSource;
+  final HealthImportStore? healthImportStore;
+
+  /// Watch brand accounts the server imports from; none in tests.
+  final AccountLinkRepository? accountLinks;
+  final ExternalBrowser? browser;
   final PhotoSource photoSource;
   final ImageSink imageSink;
 
@@ -115,8 +137,18 @@ class PrachayaRunApp extends StatelessWidget {
   /// Time source for recording (debug builds pass a speed-up clock).
   final DateTime Function()? clock;
 
+  /// Runs and hikes count toward the primary shoe.
+  Future<String?> _defaultShoe(ActivityType type) async =>
+      type == ActivityType.ride ? null : (await shoeRepository.primary())?.id;
+
+  List<ActivitySavedHook> get _onSaved => [
+    (a) => CompleteWorkoutForActivity(workoutRepository)(a),
+  ];
+
   @override
   Widget build(BuildContext context) {
+    final health = healthSource;
+    final healthStore = healthImportStore;
     return MultiRepositoryProvider(
       providers: [
         RepositoryProvider.value(value: activityRepository),
@@ -136,19 +168,30 @@ class PrachayaRunApp extends StatelessWidget {
               heartRateMonitor: heartRateMonitor,
               saveActivity: SaveActivity(
                 activityRepository,
-                // Runs and hikes count toward the primary shoe.
-                defaultShoe: (type) async => type == ActivityType.ride
-                    ? null
-                    : (await shoeRepository.primary())?.id,
-                onSaved: [
-                  (a) => CompleteWorkoutForActivity(workoutRepository)(a),
-                ],
+                defaultShoe: _defaultShoe,
+                onSaved: _onSaved,
               ),
               clock: clock,
             ),
           ),
           BlocProvider(
             create: (_) => HeartRateCubit(heartRateMonitor)..start(),
+          ),
+          BlocProvider(
+            create: (_) => HealthImportCubit(
+              source: health,
+              store: healthStore,
+              importer: health == null || healthStore == null
+                  ? null
+                  : ImportActivities(
+                      health,
+                      activityRepository,
+                      healthStore,
+                      titleFor: defaultActivityTitle,
+                      defaultShoe: _defaultShoe,
+                      onSaved: _onSaved,
+                    ),
+            )..load(),
           ),
           BlocProvider(create: (_) => HistoryCubit(activityRepository)..load()),
           BlocProvider(
@@ -161,6 +204,9 @@ class PrachayaRunApp extends StatelessWidget {
           BlocProvider(create: (_) => SyncCubit(activitySync)),
           BlocProvider(create: (_) => AuthCubit(authRepository)..start()),
           BlocProvider(create: (_) => ProfileCubit(profileRepository)..load()),
+          BlocProvider(
+            create: (_) => LinkedAccountsCubit(accountLinks, browser)..load(),
+          ),
           BlocProvider(create: (_) => UnitsCubit(settingsRepository)..load()),
           BlocProvider(
             create: (_) =>
@@ -195,6 +241,7 @@ class PrachayaRunApp extends StatelessWidget {
                 context.refreshActivities();
                 // Signed out shows the device's own profile.
                 context.read<ProfileCubit>().load();
+                context.read<LinkedAccountsCubit>().load();
                 if (state.status != AuthStatus.signedIn) return;
                 context.read<SyncCubit>().sync();
                 // Stitch 07.1: merge data recorded signed out, or keep it.
@@ -226,18 +273,22 @@ class PrachayaRunApp extends StatelessWidget {
             child: RecordingCompanion(
               mirror: recordingMirror,
               voice: voiceCoach,
-              child: MaterialApp(
-                navigatorKey: _navigatorKey,
-                builder: debugTools == null
-                    ? null
-                    : (context, child) => DebugOverlay(
-                        navigatorKey: _navigatorKey,
-                        child: child!,
-                      ),
-                title: 'Prachaya Run',
-                debugShowCheckedModeBanner: false,
-                theme: AppTheme.dark(),
-                home: SplashPage(next: (_) => const HomePage()),
+              child: HealthImportListener(
+                child: LinkedAccountsListener(
+                  child: MaterialApp(
+                    navigatorKey: _navigatorKey,
+                    builder: debugTools == null
+                        ? null
+                        : (context, child) => DebugOverlay(
+                            navigatorKey: _navigatorKey,
+                            child: child!,
+                          ),
+                    title: 'Prachaya Run',
+                    debugShowCheckedModeBanner: false,
+                    theme: AppTheme.dark(),
+                    home: SplashPage(next: (_) => const HomePage()),
+                  ),
+                ),
               ),
             ),
           ),

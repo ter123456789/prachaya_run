@@ -1,6 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:prachaya_run/features/activity/data/models/activity_json_mapper.dart';
 import 'package:prachaya_run/features/activity/domain/entities/activity.dart';
+import 'package:prachaya_run/features/activity/domain/entities/activity_origin.dart';
+import 'package:prachaya_run/features/activity/domain/entities/activity_type.dart';
 
 import '../../../helpers/fakes.dart';
 
@@ -73,5 +75,47 @@ void main() {
     expect(none.containsKey('heartRate'), isTrue);
     expect(none['heartRate'], isNull);
     expect(ActivityJsonMapper.activityFromJson(none).heartRate, isNull);
+  });
+
+  test('origin and no-track activities (v1.6)', () {
+    final a = Activity(
+      id: 'a',
+      type: ActivityType.run,
+      title: '',
+      startedAt: t0,
+      endedAt: t0.add(const Duration(minutes: 40)),
+      movingTime: const Duration(minutes: 40),
+      segments: const [],
+      origin: const ActivityOrigin(OriginKind.health, app: 'Samsung Health'),
+      reportedDistanceMeters: 7000,
+    );
+    final json = ActivityJsonMapper.activityToJson(a, updatedAt: t0);
+    expect(json['origin'], {
+      'kind': 'health',
+      'app': 'Samsung Health',
+      'device': null,
+    });
+    expect(json['distanceM'], 7000);
+    expect(json['elevationGainM'], 0);
+    final back = ActivityJsonMapper.activityFromJson(json);
+    expect(back.origin, a.origin);
+    expect(back.distanceMeters, 7000);
+
+    // A phone activity sends no origin and no totals (the server computes).
+    final phone = ActivityJsonMapper.activityToJson(
+      sampleActivity(),
+      updatedAt: t0,
+    );
+    expect(phone['origin'], isNull);
+    expect(phone.containsKey('distanceM'), isFalse);
+
+    final summary = ActivityJsonMapper.summaryFromJson({
+      ...json,
+      'origin': {'kind': 'polar', 'app': null, 'device': 'Pacer Pro'},
+      'distanceM': 7000,
+      'elevationGainM': 0,
+    });
+    expect(summary.origin.kind, OriginKind.polar);
+    expect(summary.origin.device, 'Pacer Pro');
   });
 }

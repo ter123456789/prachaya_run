@@ -12,6 +12,8 @@ import 'package:prachaya_run/features/activity/data/repositories/offline_first_a
 import 'package:prachaya_run/features/activity/data/repositories/offline_first_photo_repository.dart';
 import 'package:prachaya_run/features/activity/data/sync/activity_sync_engine.dart';
 import 'package:prachaya_run/features/activity/domain/entities/activity.dart';
+import 'package:prachaya_run/features/activity/domain/entities/activity_origin.dart';
+import 'package:prachaya_run/features/activity/domain/entities/activity_type.dart';
 import 'package:prachaya_run/features/activity/domain/entities/heart_rate.dart';
 import 'package:prachaya_run/features/activity/domain/services/activity_sync.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
@@ -195,6 +197,41 @@ void main() {
     await engine.sync();
     final full = await repository.getById(otherId);
     expect(full!.heartRate, sampleHeartRate());
+  });
+
+  test('a watch activity without a track goes up with its distance and '
+      'comes back to another device (v1.6)', () async {
+    final watch = Activity(
+      id: _id,
+      type: ActivityType.run,
+      title: 'ลู่วิ่ง',
+      startedAt: t0,
+      endedAt: t0.add(const Duration(minutes: 30)),
+      movingTime: const Duration(minutes: 30),
+      segments: const [],
+      origin: const ActivityOrigin(OriginKind.health, app: 'Samsung Health'),
+      reportedDistanceMeters: 6000,
+    );
+    await repository.save(watch);
+    await engine.sync();
+    final sent = server.uploads.single;
+    expect(sent['distanceM'], 6000);
+    expect((sent['origin']! as Map)['app'], 'Samsung Health');
+    expect((await repository.getAll()).single.distanceMeters, 6000);
+
+    const otherId = '0a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d';
+    server.seed({
+      ...ActivityJsonMapper.activityToJson(watch, updatedAt: now),
+      'id': otherId,
+    });
+    await engine.sync();
+    final pulled = (await repository.getAll()).firstWhere(
+      (s) => s.id == otherId,
+    );
+    expect(pulled.origin.app, 'Samsung Health');
+    final full = await repository.getById(otherId);
+    expect(full!.hasTrack, isFalse);
+    expect(full.distanceMeters, 6000);
   });
 
   test('server copy newer than the upload wins', () async {

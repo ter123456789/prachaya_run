@@ -1,6 +1,6 @@
 # เชื่อมบัญชีแบรนด์นาฬิกา (แบบ Strava) — Polar ก่อน, Garmin เมื่อเปิดรับ
 
-สถานะ: **สเปก ยังไม่ได้ลงมือ** — คุยไว้ 2026-10-27
+สถานะ: **ทำแล้ว 2026-10-27 (Polar)** — แอป + API v1.6; Garmin รอโปรแกรมเปิด; ยังไม่ได้ลองกับบัญชี Polar จริง
 งานคู่กัน: [health-import.md](health-import.md) (อ่านจาก Health ในเครื่อง — ใช้ `origin` และกิจกรรมไม่มีเส้นทางร่วมกัน)
 
 ## Strava ทำอย่างไร
@@ -84,6 +84,14 @@ status, linked_at, last_import_at)` — token เข้ารหัสด้ว�
 ผู้ใช้จำนวนมากมี Strava ที่รับจาก Garmin / Samsung / Coros อยู่แล้ว → ถ้าเชื่อม Strava API (เปิดให้สมัครเอง)
 ได้กิจกรรมจากทุกแบรนด์ทางเดียว — **แต่ต้องอ่านข้อตกลง Strava API ฉบับปัจจุบันก่อน**
 (มีข้อจำกัดเรื่องการแสดงข้อมูลและการใช้ข้อมูล ยังไม่ได้ตรวจ) และเราจะพึ่งคู่แข่งโดยตรง
+
+## ต่างจากสเปกตอนลงมือ
+- ตัวอ่าน FIT: `fit-file-parser` (MIT) — `@garmin/fitsdk` ใช้ไลเซนส์เฉพาะของ Garmin (ใช้ภายในเท่านั้น) จึงไม่เลือก
+- Polar: ใช้ exercise transactions (เอกสาร Polar ระบุว่า deprecated แต่ยังใช้ได้) — เปลี่ยนเป็น
+  `GET /v3/exercises` ได้ใน `polar-client.ts` ที่เดียว; ยังไม่มี webhook (poll อย่างเดียว)
+- แอปไม่รับ deep link เอง: callback redirect ไป `prachayarun://links/...` แค่พาแอปกลับมา แล้ว resume โหลดสถานะใหม่
+- เปิดเบราว์เซอร์ด้วย channel `prachaya/browser` ของเราเอง (ไม่ใช้ `flutter_web_auth_2`)
+- รายละเอียดที่ยังไม่ได้ยืนยันกับ Polar จริง: ดูหัวข้อ "Details settled" ใน api.md และ README ของ rinning_API
 
 ## ลำดับงาน
 1. API v1.6 `origin` + กิจกรรมไม่มีเส้นทาง (ทำร่วมกับ health-import)

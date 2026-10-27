@@ -8,10 +8,16 @@ import 'package:prachaya_run/features/activity/domain/entities/heart_rate.dart';
 import 'package:prachaya_run/features/activity/domain/entities/track_point.dart';
 import 'package:prachaya_run/features/activity/domain/repositories/activity_repository.dart';
 import 'package:prachaya_run/features/activity/domain/services/activity_sync.dart';
+import 'package:prachaya_run/features/activity/domain/entities/imported_workout.dart';
+import 'package:prachaya_run/features/activity/domain/repositories/health_import_store.dart';
+import 'package:prachaya_run/features/activity/domain/services/health_source.dart';
 import 'package:prachaya_run/features/activity/domain/services/heart_rate_measurement.dart';
 import 'package:prachaya_run/features/activity/domain/services/heart_rate_monitor.dart';
 import 'package:prachaya_run/features/activity/domain/services/location_tracker.dart';
 import 'package:prachaya_run/features/auth/domain/entities/auth_user.dart';
+import 'package:prachaya_run/features/auth/domain/entities/linked_accounts.dart';
+import 'package:prachaya_run/features/auth/domain/repositories/account_link_repository.dart';
+import 'package:prachaya_run/features/auth/domain/services/external_browser.dart';
 import 'package:prachaya_run/features/auth/domain/repositories/auth_repository.dart';
 import 'package:prachaya_run/features/auth/domain/entities/user_profile.dart';
 import 'package:prachaya_run/features/auth/domain/repositories/profile_repository.dart';
@@ -152,6 +158,100 @@ class FakeHeartRateMonitor implements HeartRateMonitor {
   Future<void> disconnect() async {
     connected = remembered = null;
     emitStatus(SensorLink.disconnected);
+  }
+}
+
+class FakeHealthSource implements HealthSource {
+  HealthAccess access = HealthAccess.granted;
+  bool asked = false;
+  final List<ImportedWorkout> stored = [];
+  final Map<String, WorkoutDetail> details = {};
+
+  /// Heart rate from any app (a watch worn while the phone recorded).
+  final List<HeartRateSample> heartRates = [];
+  final List<String> detailsRead = [];
+
+  @override
+  Future<HealthAccess> availability() async =>
+      asked ? access : HealthAccess.denied;
+
+  @override
+  Future<HealthAccess> requestAccess() async {
+    asked = true;
+    return access;
+  }
+
+  @override
+  Future<List<ImportedWorkout>> workouts({
+    required DateTime from,
+    required DateTime to,
+  }) async => [
+    for (final w in stored)
+      if (!w.start.isBefore(from) && !w.start.isAfter(to)) w,
+  ];
+
+  @override
+  Future<WorkoutDetail> detail(ImportedWorkout workout) async {
+    detailsRead.add(workout.externalId);
+    return details[workout.externalId] ?? const WorkoutDetail();
+  }
+
+  @override
+  Future<List<HeartRateSample>> heartRate({
+    required DateTime from,
+    required DateTime to,
+  }) async => [
+    for (final s in heartRates)
+      if (!s.timestamp.isBefore(from) && !s.timestamp.isAfter(to)) s,
+  ];
+}
+
+class InMemoryHealthImportStore implements HealthImportStore {
+  InMemoryHealthImportStore([this.settings = const HealthImportSettings()]);
+
+  HealthImportSettings settings;
+
+  @override
+  Future<HealthImportSettings> load() async => settings;
+
+  @override
+  Future<void> save(HealthImportSettings settings) async =>
+      this.settings = settings;
+}
+
+class FakeAccountLinks implements AccountLinkRepository {
+  FakeAccountLinks({this.available = const [LinkProvider.polar]});
+
+  List<LinkProvider> available;
+  final List<AccountLink> links = [];
+  final List<LinkProvider> synced = [];
+  bool unavailable = false;
+
+  @override
+  Future<LinkedAccounts> load() async =>
+      LinkedAccounts(available: available, links: [...links]);
+
+  @override
+  Future<Uri> start(LinkProvider provider) async {
+    if (unavailable) throw const AccountLinkUnavailable();
+    return Uri.parse('https://flow.polar.com/oauth2/authorization?state=s');
+  }
+
+  @override
+  Future<void> sync(LinkProvider provider) async => synced.add(provider);
+
+  @override
+  Future<void> unlink(LinkProvider provider) async =>
+      links.removeWhere((l) => l.provider == provider);
+}
+
+class FakeBrowser implements ExternalBrowser {
+  final List<Uri> opened = [];
+
+  @override
+  Future<bool> open(Uri url) async {
+    opened.add(url);
+    return true;
   }
 }
 

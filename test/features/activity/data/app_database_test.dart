@@ -173,9 +173,7 @@ void main() {
       'synced': 1,
     });
     await v5.execute('DROP TABLE ${AppDatabase.routesTable}');
-    await v5.execute(
-      'ALTER TABLE ${AppDatabase.activitiesTable} DROP COLUMN heart_rate',
-    );
+    await _dropColumns(v5, ['heart_rate', 'origin']);
     await v5.setVersion(4);
     await v5.close();
 
@@ -199,9 +197,7 @@ void main() {
     final path = '${dir.path}/test.db';
     // A v5 database: the current schema without the v6 column.
     final current = await AppDatabase.open(factory: factory, path: path);
-    await current.execute(
-      'ALTER TABLE ${AppDatabase.activitiesTable} DROP COLUMN heart_rate',
-    );
+    await _dropColumns(current, ['heart_rate', 'origin']);
     await current.insert(AppDatabase.activitiesTable, {
       'id': 'a1',
       'type': 'run',
@@ -217,10 +213,48 @@ void main() {
 
     final db = await AppDatabase.open(factory: factory, path: path);
     addTearDown(db.close);
-    expect(await db.getVersion(), 6);
+    expect(await db.getVersion(), AppDatabase.version);
     final row = (await db.query(AppDatabase.activitiesTable)).single;
     expect(row['title'], 'v5 run');
     expect(row.containsKey('heart_rate'), isTrue);
     expect(row['heart_rate'], isNull);
   });
+
+  test('v6 → v7 adds origin; old activities are from the phone', () async {
+    final dir = Directory.systemTemp.createTempSync('prachaya_db');
+    addTearDown(() => dir.deleteSync(recursive: true));
+    final path = '${dir.path}/test.db';
+    final current = await AppDatabase.open(factory: factory, path: path);
+    await _dropColumns(current, ['origin']);
+    await current.insert(AppDatabase.activitiesTable, {
+      'id': 'a1',
+      'type': 'run',
+      'title': 'v6 run',
+      'started_at': 0,
+      'ended_at': 1000,
+      'moving_time_ms': 1000,
+      'distance_m': 100,
+      'elevation_gain_m': 0,
+    });
+    await current.setVersion(6);
+    await current.close();
+
+    final db = await AppDatabase.open(factory: factory, path: path);
+    addTearDown(db.close);
+    expect(await db.getVersion(), 7);
+    final row = (await db.query(AppDatabase.activitiesTable)).single;
+    expect(row['title'], 'v6 run');
+    expect(row.containsKey('origin'), isTrue);
+    expect(row['origin'], isNull);
+  });
+}
+
+/// Rolls the activities table back to before the migrations that added
+/// [columns].
+Future<void> _dropColumns(Database db, List<String> columns) async {
+  for (final c in columns) {
+    await db.execute(
+      'ALTER TABLE ${AppDatabase.activitiesTable} DROP COLUMN $c',
+    );
+  }
 }

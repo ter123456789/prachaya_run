@@ -6,6 +6,7 @@ import UserNotifications
 @objc class AppDelegate: FlutterAppDelegate, FlutterImplicitEngineDelegate {
   private var liveActivity: LiveActivityBridge?
   private var heartRate: HeartRateBridge?
+  private var health: HealthBridge?
 
   override func application(
     _ application: UIApplication,
@@ -22,5 +23,15 @@ import UserNotifications
     GeneratedPluginRegistrant.register(with: engineBridge.pluginRegistry)
     liveActivity = LiveActivityBridge(messenger: engineBridge.applicationRegistrar.messenger())
     heartRate = HeartRateBridge(messenger: engineBridge.applicationRegistrar.messenger())
+    health = HealthBridge(messenger: engineBridge.applicationRegistrar.messenger())
+    // Linking a watch account: the brand's sign-in page in Safari.
+    let browser = FlutterMethodChannel(
+      name: "prachaya/browser", binaryMessenger: engineBridge.applicationRegistrar.messenger())
+    browser.setMethodCallHandler { call, result in
+      guard call.method == "open", let args = call.arguments as? [String: Any],
+        let raw = args["url"] as? String, let url = URL(string: raw)
+      else { return result(FlutterMethodNotImplemented) }
+      UIApplication.shared.open(url) { result($0) }
+    }
   }
 }

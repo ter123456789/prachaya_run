@@ -1,4 +1,5 @@
 import '../../domain/entities/activity.dart';
+import '../../domain/entities/activity_origin.dart';
 import '../../domain/entities/activity_type.dart';
 import '../../domain/entities/heart_rate.dart';
 import '../../domain/entities/track_point.dart';
@@ -18,6 +19,12 @@ abstract final class ActivityJsonMapper {
     'updatedAt': time(updatedAt),
     'shoeId': a.shoeId,
     'heartRate': heartRateToJson(a),
+    'origin': originToJson(a.origin),
+    // v1.6: without points the server takes the watch's figures.
+    if (!a.hasTrack) ...{
+      'distanceM': a.distanceMeters,
+      'elevationGainM': a.elevationGainMeters,
+    },
     'segments': [
       for (final segment in a.segments)
         [
@@ -67,6 +74,22 @@ abstract final class ActivityJsonMapper {
     );
   }
 
+  static Json? originToJson(ActivityOrigin o) => o.isPhone
+      ? null
+      : {'kind': o.kind.name, 'app': o.app, 'device': o.device};
+
+  static ActivityOrigin originFromJson(Object? value) {
+    if (value == null) return ActivityOrigin.phone;
+    final json = value as Json;
+    final kind = OriginKind.values.asNameMap()[json['kind']];
+    return ActivityOrigin(
+      // A kind added by a newer server still reads as "from a watch".
+      kind ?? OriginKind.health,
+      app: json['app'] as String?,
+      device: json['device'] as String?,
+    );
+  }
+
   static RemoteActivitySummary summaryFromJson(
     Json json,
   ) => RemoteActivitySummary(
@@ -82,6 +105,7 @@ abstract final class ActivityJsonMapper {
     deletedAt: json['deletedAt'] == null ? null : parseTime(json['deletedAt']),
     photoCount: (json['photoCount'] as num?)?.toInt() ?? 0,
     shoeId: json['shoeId'] as String?,
+    origin: originFromJson(json['origin']),
   );
 
   static RemotePhoto photoFromJson(Json json) => RemotePhoto(
@@ -103,6 +127,9 @@ abstract final class ActivityJsonMapper {
       ),
       shoeId: json['shoeId'] as String?,
       heartRate: heartRateFromJson(json['heartRate'], startedAt),
+      origin: originFromJson(json['origin']),
+      reportedDistanceMeters: (json['distanceM'] as num?)?.toDouble(),
+      reportedElevationGainMeters: (json['elevationGainM'] as num?)?.toDouble(),
       segments: [
         for (final segment in json['segments']! as List<Object?>)
           [

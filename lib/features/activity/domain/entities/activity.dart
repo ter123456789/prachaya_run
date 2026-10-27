@@ -1,9 +1,14 @@
 import '../services/geo_math.dart';
+import 'activity_origin.dart';
 import 'activity_type.dart';
 import 'heart_rate.dart';
 import 'track_point.dart';
 
 /// A finished, saved activity. [segments] are separated by pauses.
+///
+/// An activity imported from a watch may have no points at all (treadmill,
+/// or an app that shares no route); its distance and climb then come from
+/// the watch ([reportedDistanceMeters], [reportedElevationGainMeters]).
 class Activity {
   Activity({
     required this.id,
@@ -15,6 +20,9 @@ class Activity {
     required List<List<TrackPoint>> segments,
     this.shoeId,
     this.heartRate,
+    this.origin = ActivityOrigin.phone,
+    this.reportedDistanceMeters,
+    this.reportedElevationGainMeters,
   }) : segments = List<List<TrackPoint>>.unmodifiable(
          segments.map(List<TrackPoint>.unmodifiable),
        );
@@ -33,6 +41,15 @@ class Activity {
   /// Null when recorded without a heart-rate sensor.
   final HeartRateTrack? heartRate;
 
+  final ActivityOrigin origin;
+
+  /// Used only when there are no points.
+  final double? reportedDistanceMeters;
+  final double? reportedElevationGainMeters;
+
+  /// At least one GPS point (imported activities may have none).
+  bool get hasTrack => segments.any((s) => s.isNotEmpty);
+
   late final double distanceMeters = _computeDistance();
   late final double elevationGainMeters = _computeElevationGain();
 
@@ -45,10 +62,21 @@ class Activity {
     distanceMeters: distanceMeters,
     elevationGainMeters: elevationGainMeters,
     shoeId: shoeId,
+    endedAt: endedAt,
+    origin: origin,
   );
 
   /// The same activity linked to [shoeId] (null unlinks it).
-  Activity withShoe(String? shoeId) => Activity(
+  Activity withShoe(String? shoeId) => _copy(shoeId: () => shoeId);
+
+  /// The same activity with [heartRate] (e.g. back-filled from Health).
+  Activity withHeartRate(HeartRateTrack? heartRate) =>
+      _copy(heartRate: () => heartRate);
+
+  Activity _copy({
+    String? Function()? shoeId,
+    HeartRateTrack? Function()? heartRate,
+  }) => Activity(
     id: id,
     type: type,
     title: title,
@@ -56,8 +84,11 @@ class Activity {
     endedAt: endedAt,
     movingTime: movingTime,
     segments: segments,
-    shoeId: shoeId,
-    heartRate: heartRate,
+    shoeId: shoeId == null ? this.shoeId : shoeId(),
+    heartRate: heartRate == null ? this.heartRate : heartRate(),
+    origin: origin,
+    reportedDistanceMeters: reportedDistanceMeters,
+    reportedElevationGainMeters: reportedElevationGainMeters,
   );
 
   /// Splits of [every] meters, timed by GPS timestamps (pauses excluded).
@@ -104,6 +135,7 @@ class Activity {
   }
 
   double _computeDistance() {
+    if (!hasTrack) return reportedDistanceMeters ?? 0;
     var total = 0.0;
     for (final segment in segments) {
       for (var i = 1; i < segment.length; i++) {
@@ -114,6 +146,7 @@ class Activity {
   }
 
   double _computeElevationGain() {
+    if (!hasTrack) return reportedElevationGainMeters ?? 0;
     final counter = ElevationGainCounter();
     for (final segment in segments) {
       counter.breakSegment();
@@ -136,6 +169,8 @@ class ActivitySummary {
     required this.distanceMeters,
     required this.elevationGainMeters,
     this.shoeId,
+    this.endedAt,
+    this.origin = ActivityOrigin.phone,
   });
 
   final String id;
@@ -146,6 +181,13 @@ class ActivitySummary {
   final double distanceMeters;
   final double elevationGainMeters;
   final String? shoeId;
+
+  /// Null where only the start is known (older callers); see [end].
+  final DateTime? endedAt;
+  final ActivityOrigin origin;
+
+  /// [endedAt], or the start plus the moving time.
+  DateTime get end => endedAt ?? startedAt.add(movingTime);
 
   double get averageSpeedMps => _speed(distanceMeters, movingTime);
 }

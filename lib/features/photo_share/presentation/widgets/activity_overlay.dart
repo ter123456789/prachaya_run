@@ -282,7 +282,7 @@ class _Header extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          activity.title,
+          activityTitle(activity.title, activity.type, activity.startedAt),
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
           style: TextStyle(fontSize: 22 * u, fontWeight: FontWeight.w500),

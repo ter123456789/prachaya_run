@@ -102,6 +102,7 @@ Rules (enforced for every feature by `test/architecture_test.dart`):
   data JSON, updated_at, deleted_at, synced — same scoping, LWW and tombstones as activities).
   The profile is in `kv` (`profile:<userId>`, `profile:local` while signed out, `_dirty` flag).
 - Sync order: push → pull → photos → participants (ProfileSync, /shoes, /workouts, /routes).
+  DB is at v7.
   503 `storage_unavailable` (server photo storage down) keeps photos queued, still syncs the
   participants, and reports the run as `failed` so it is retried.
   ProfileSync PATCHes every field when dirty (so clearing reaches the server), else GETs `/me`;
@@ -114,6 +115,30 @@ Rules (enforced for every feature by `test/architecture_test.dart`):
   `VALHALLA_URL` → 503 `provider_not_configured`. Needs an account; signed out or offline the drawing
   alone can be saved (`route: null`). The app scores the fit itself (`route_fit.dart`: share of the route
   within 6 % of the shape's size of the drawing, and share of the drawing covered; detours shown amber).
+- Activities from watches (api.md v1.6; specs `docs/backlog/health-import.md`, `watch-account-link.md`):
+  - **`origin`** `{kind: phone|health|polar|garmin, app, device}` on activity + summary (DB v7
+    `activities.origin` JSON, NULL = phone). Shown as `OriginTag` ("⌚ Samsung Health").
+  - **No-track activities:** `segments` may be empty for non-phone origins; distance/climb come from
+    `reportedDistanceMeters` / `reportedElevationGainMeters` (sent as `distanceM` / `elevationGainM`,
+    stored in the existing row columns). `Activity.hasTrack`; UI shows `NoRoute` instead of map/route.
+  - **Untitled:** server imports have `title: ''` → `activityTitle()` shows the default title.
+  - **Stable ids:** `uuidV5('<source>:<external id>')` (pure-Dart SHA-1, namespace in `uuid.dart`).
+- Health import (`ImportActivities` use case, `HealthImportCubit`, profile "นำเข้ากิจกรรมจากนาฬิกา"):
+  - **Native, no plugin:** `NativeHealthSource` on `prachaya/health` → `ios/Runner/HealthBridge.swift`
+    (HealthKit) / `HealthBridge.kt` (Health Connect `connect-client`, so Android minSdk is 26).
+  - **When:** on launch, on every resume (`HealthImportListener`) and "นำเข้าตอนนี้". Each run reads workouts
+    since the last run − 7 days; ids already seen (kv `settings.health_import.seen`) or present are skipped,
+    so deleted imports never return.
+  - **Same workout:** ≥ 50 % time overlap with an existing activity → no new one; its heart rate is attached
+    if missing. Phone runs of the last 48 h without HR get Health HR (samples inside segments only).
+  - **iOS needs** the HealthKit capability: `Runner.entitlements` has the keys, but like Sign in with Apple
+    it only applies once `CODE_SIGN_ENTITLEMENTS` is set; without it every call answers `unavailable`.
+  - Health Connect routes from other apps may need per-session consent; those come in without a route.
+- Linked accounts (Strava-style, server pulls Polar now / Garmin later): `LinkedAccountsCubit` +
+  profile "บัญชีนาฬิกา" (signed in, only brands in `GET /me/links` `available`). Linking opens the browser
+  (`prachaya/browser` channel in AppDelegate / MainActivity); the callback redirects to
+  `prachayarun://links/...` (URL scheme registered, Flutter deep linking off) and `LinkedAccountsListener`
+  reloads links, POSTs `/sync` and syncs on resume. Imported activities arrive through the normal feed.
 - DB v6 adds `activities.heart_rate` (JSON `{source, samples: [[t, bpm]]}`, t = ms since start). It is
   part of the track: written by `_replaceTrack`, cleared by `_deleteTrack`. API v1.5 sends it as
   `heartRate {source, samples: [{t, bpm}]}` on the full activity only (not summary/list/feed).
@@ -138,7 +163,7 @@ Rules (enforced for every feature by `test/architecture_test.dart`):
   AvatarButton, SectionHeader, FloatingDock + OrbButton, Shimmer, EdgeFade, FadeSlideIn, FadeIndexedStack.
   `features/activity/presentation/widgets/route_canvas.dart` draws the self-animating luminescent route.
 - Not in the app on purpose: notification bell, place names. Profile 08 hides resting HR, VO2 Max, fitness age,
-  Strava/Apple Health and route privacy; schedule 09 hides multi-week plan names and best-time
+  Strava and route privacy; schedule 09 hides multi-week plan names and best-time
   windows — no data source. Never show the design's sample values.
 - HR zones: Max HR = user value, else Tanaka `208 − 0.7 × age` (birth year typed in พ.ศ. or ค.ศ.);
   zones 1–5 = 50–60 … 90–100 % (ceil of each lower bound, no overlap). Focus zone 2.

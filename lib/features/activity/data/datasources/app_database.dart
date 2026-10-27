@@ -12,7 +12,7 @@ abstract final class AppDatabase {
   static const shoesTable = 'shoes';
   static const workoutsTable = 'planned_workouts';
   static const routesTable = 'planned_routes';
-  static const version = 6;
+  static const version = 7;
 
   /// [factory] and [path] let tests use an in-memory FFI database.
   static Future<Database> open({DatabaseFactory? factory, String? path}) async {
@@ -29,6 +29,7 @@ abstract final class AppDatabase {
           await _upgradeToV4(db);
           await _upgradeToV5(db);
           await _upgradeToV6(db);
+          await _upgradeToV7(db);
         },
         onUpgrade: (db, oldVersion, newVersion) async {
           if (oldVersion < 2) await _upgradeToV2(db);
@@ -36,6 +37,7 @@ abstract final class AppDatabase {
           if (oldVersion < 4) await _upgradeToV4(db);
           if (oldVersion < 5) await _upgradeToV5(db);
           if (oldVersion < 6) await _upgradeToV6(db);
+          if (oldVersion < 7) await _upgradeToV7(db);
         },
       ),
     );
@@ -185,6 +187,13 @@ abstract final class AppDatabase {
   /// start). Part of the track: NULL whenever the track is not stored.
   static Future<void> _upgradeToV6(Database db) =>
       db.execute('ALTER TABLE $activitiesTable ADD COLUMN heart_rate TEXT');
+
+  /// v7: `activities.origin`, where an activity was recorded as JSON
+  /// (`{"kind": "health", "app": ..., "device": ...}`); NULL = this phone.
+  /// Activities without points keep their distance and climb in the
+  /// existing `distance_m` / `elevation_gain_m` columns.
+  static Future<void> _upgradeToV7(Database db) =>
+      db.execute('ALTER TABLE $activitiesTable ADD COLUMN origin TEXT');
 
   static Future<void> _createRecordTable(Database db, String table) async {
     await db.execute('''

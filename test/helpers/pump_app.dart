@@ -19,6 +19,10 @@ class TestApp {
   final reminderSettings = InMemoryReminderSettings();
   final tracker = FakeLocationTracker();
   final heartRate = FakeHeartRateMonitor();
+  final health = FakeHealthSource();
+  final healthStore = InMemoryHealthImportStore();
+  final accountLinks = FakeAccountLinks();
+  final browser = FakeBrowser();
 
   /// Pumps the whole app on a phone-sized screen with reduced motion (so
   /// looping animations stop and pumpAndSettle ends).
@@ -46,6 +50,10 @@ class TestApp {
         reminderSettings: reminderSettings,
         locationTracker: tracker,
         heartRateMonitor: heartRate,
+        healthSource: health,
+        healthImportStore: healthStore,
+        accountLinks: accountLinks,
+        browser: browser,
         photoSource: FakePhotoSource(),
         imageSink: FakeImageSink(),
       ),

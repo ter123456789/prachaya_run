@@ -46,13 +46,20 @@ class FakeServer {
   late final client = MockClient(_handle);
 
   /// Adds an activity as if another device had uploaded it.
-  void seed(Map<String, Object?> body) => activities[body['id']! as String] = {
-    ...body,
-    'distanceM': 1000.0,
-    'elevationGainM': 5.0,
-    'deletedAt': null,
-    '_serverUpdatedAt': ++_clock,
-  };
+  /// Totals are fixed (1000 m, 5 m) unless it has no points (v1.6): then
+  /// the body's own figures are kept, as the real server does.
+  void seed(Map<String, Object?> body) {
+    final noPoints = (body['segments']! as List).every(
+      (s) => (s as List).isEmpty,
+    );
+    activities[body['id']! as String] = {
+      ...body,
+      'distanceM': noPoints ? body['distanceM'] : 1000.0,
+      'elevationGainM': noPoints ? body['elevationGainM'] ?? 0.0 : 5.0,
+      'deletedAt': null,
+      '_serverUpdatedAt': ++_clock,
+    };
+  }
 
   /// Adds a photo as if another device had uploaded it.
   void seedPhoto(String activityId, String photoId, List<int> bytes) {

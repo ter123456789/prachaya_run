@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import '../../domain/entities/activity.dart';
+import '../../domain/entities/activity_origin.dart';
 import '../../domain/entities/activity_type.dart';
 import '../../domain/entities/heart_rate.dart';
 import '../../domain/entities/track_point.dart';
@@ -30,6 +31,7 @@ abstract final class ActivityRowMapper {
     'has_track': 1,
     'owner_id': ownerId,
     'shoe_id': a.shoeId,
+    'origin': originToColumn(a.origin),
   };
 
   /// A row matching the server's copy. [hasTrack] says whether the GPS
@@ -54,6 +56,7 @@ abstract final class ActivityRowMapper {
     'owner_id': ownerId,
     'photo_count': s.photoCount,
     'shoe_id': s.shoeId,
+    'origin': originToColumn(s.origin),
   };
 
   static Iterable<Row> pointsToRows(Activity a) sync* {
@@ -108,6 +111,21 @@ abstract final class ActivityRowMapper {
     );
   }
 
+  static String? originToColumn(ActivityOrigin o) => o.isPhone
+      ? null
+      : jsonEncode({'kind': o.kind.name, 'app': o.app, 'device': o.device});
+
+  static ActivityOrigin originFromColumn(Object? value) {
+    if (value == null) return ActivityOrigin.phone;
+    final json = jsonDecode(value as String) as Map<String, Object?>;
+    final kind = OriginKind.values.asNameMap()[json['kind']];
+    return ActivityOrigin(
+      kind ?? OriginKind.health,
+      app: json['app'] as String?,
+      device: json['device'] as String?,
+    );
+  }
+
   static ActivitySummary summaryFromRow(Row row) => ActivitySummary(
     id: row['id']! as String,
     type: ActivityType.values.byName(row['type']! as String),
@@ -117,6 +135,8 @@ abstract final class ActivityRowMapper {
     distanceMeters: (row['distance_m']! as num).toDouble(),
     elevationGainMeters: (row['elevation_gain_m']! as num).toDouble(),
     shoeId: row['shoe_id'] as String?,
+    endedAt: _time(row['ended_at']),
+    origin: originFromColumn(row['origin']),
   );
 
   /// [pointRows] must be ordered by segment, then seq.
@@ -150,6 +170,11 @@ abstract final class ActivityRowMapper {
       segments: segments,
       shoeId: row['shoe_id'] as String?,
       heartRate: heartRateFromColumn(row['heart_rate'], startedAt),
+      origin: originFromColumn(row['origin']),
+      // Only used when there are no points (imported without a route).
+      reportedDistanceMeters: (row['distance_m'] as num?)?.toDouble(),
+      reportedElevationGainMeters: (row['elevation_gain_m'] as num?)
+          ?.toDouble(),
     );
   }
 

@@ -1,3 +1,4 @@
+import '../../domain/entities/activity_origin.dart';
 import '../../domain/entities/activity_type.dart';
 
 /// An activity as the server describes it, without the GPS track.
@@ -16,6 +17,7 @@ class RemoteActivitySummary {
     this.deletedAt,
     this.photoCount = 0,
     this.shoeId,
+    this.origin = ActivityOrigin.phone,
   });
 
   final String id;
@@ -30,6 +32,7 @@ class RemoteActivitySummary {
   final DateTime? deletedAt;
   final int photoCount;
   final String? shoeId;
+  final ActivityOrigin origin;
 
   bool get isDeleted => deletedAt != null;
 }

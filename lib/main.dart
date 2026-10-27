@@ -17,17 +17,21 @@ import 'features/activity/data/datasources/activity_remote_data_source.dart';
 import 'features/activity/data/datasources/app_database.dart';
 import 'features/activity/data/datasources/photo_local_data_source.dart';
 import 'features/activity/data/repositories/http_challenge_repository.dart';
+import 'features/activity/data/repositories/kv_health_import_store.dart';
 import 'features/activity/data/repositories/offline_first_activity_repository.dart';
 import 'features/activity/data/repositories/offline_first_photo_repository.dart';
 import 'features/activity/data/services/android_recording_notification.dart';
 import 'features/activity/data/services/geolocator_location_tracker.dart';
 import 'features/activity/data/services/ios_live_activity_mirror.dart';
+import 'features/activity/data/services/native_health_source.dart';
 import 'features/activity/data/services/native_heart_rate_monitor.dart';
 import 'features/activity/data/services/tts_voice_coach.dart';
 import 'features/activity/data/services/open_meteo_weather_service.dart';
 import 'features/activity/data/sync/activity_sync_engine.dart';
 import 'features/activity/data/sync/device_guest_data.dart';
+import 'features/auth/data/repositories/http_account_link_repository.dart';
 import 'features/auth/data/repositories/http_auth_repository.dart';
+import 'features/auth/data/services/native_external_browser.dart';
 import 'features/auth/data/services/social_credentials.dart';
 import 'features/athlete/data/repositories/kv_settings_repository.dart';
 import 'features/athlete/data/repositories/offline_first_shoe_repository.dart';
@@ -159,6 +163,10 @@ Future<void> main() async {
       heartRateMonitor: kDebugMode
           ? SimulatedHeartRateMonitor(realHeartRate, clock!)
           : realHeartRate,
+      healthSource: NativeHealthSource(),
+      healthImportStore: KvHealthImportStore(kv),
+      accountLinks: HttpAccountLinkRepository(api, tokens),
+      browser: const NativeExternalBrowser(),
       photoSource: ImagePickerPhotoSource(),
       imageSink: DeviceImageSink(),
       clock: clock?.now,

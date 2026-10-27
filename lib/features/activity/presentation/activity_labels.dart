@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../core/formatters.dart';
 import '../domain/entities/activity_insights.dart';
+import '../domain/entities/activity_origin.dart';
 import '../domain/entities/activity_type.dart';
 import '../domain/entities/weather_report.dart';
 
@@ -24,6 +25,23 @@ extension ActivityTypeLabels on ActivityType {
 
 String defaultActivityTitle(ActivityType type, DateTime startedAt) {
   return '${type.label}${timeOfDayPeriod(startedAt)}';
+}
+
+/// The title to show: activities imported by the server arrive untitled
+/// (api.md v1.6) and get the default one.
+String activityTitle(String title, ActivityType type, DateTime startedAt) =>
+    title.trim().isEmpty ? defaultActivityTitle(type, startedAt) : title;
+
+extension ActivityOriginLabels on ActivityOrigin {
+  /// "Samsung Health", "Polar", … null for activities recorded here.
+  String? get label => isPhone
+      ? null
+      : app ??
+            switch (kind) {
+              OriginKind.polar => 'Polar',
+              OriginKind.garmin => 'Garmin',
+              _ => device ?? 'นาฬิกา',
+            };
 }
 
 extension EffortLabels on Effort {
