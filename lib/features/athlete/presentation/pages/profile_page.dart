@@ -18,7 +18,10 @@ import '../../../../core/widgets/pill_tabs.dart';
 import '../../../../core/widgets/pressable.dart';
 import '../../../../core/widgets/status_pill.dart';
 import '../../../activity/domain/services/activity_sync.dart';
+import '../../../activity/domain/services/heart_rate_monitor.dart';
+import '../../../activity/presentation/bloc/heart_rate/heart_rate_cubit.dart';
 import '../../../activity/presentation/bloc/history/history_cubit.dart';
+import '../../../activity/presentation/widgets/heart_rate_sensor_sheet.dart';
 import '../../../activity/presentation/bloc/sync/sync_cubit.dart';
 import '../../../auth/domain/entities/user_profile.dart';
 import '../../../auth/presentation/bloc/auth_cubit.dart';
@@ -796,6 +799,7 @@ class _SettingsCard extends StatelessWidget {
         children: [
           const SectionHeader('การตั้งค่า', icon: Icons.settings_outlined),
           const SizedBox(height: 6),
+          const _SensorRow(),
           _SettingRow(
             icon: Icons.straighten_rounded,
             title: 'หน่วยวัดระยะทาง',
@@ -883,6 +887,40 @@ class _SettingsCard extends StatelessWidget {
 
   static String _lead(int minutes) =>
       minutes % 60 == 0 ? '${minutes ~/ 60} ชม.' : '$minutes นาที';
+}
+
+/// The heart-rate sensor (chest strap, or a watch that broadcasts its
+/// heart rate); the same sheet as on the record page.
+class _SensorRow extends StatelessWidget {
+  const _SensorRow();
+
+  @override
+  Widget build(BuildContext context) {
+    final hr = context.watch<HeartRateCubit>().state;
+    if (!hr.available) return const SizedBox.shrink();
+    final sensor = hr.sensor;
+    final bpm = hr.bpm;
+    final subtitle = sensor == null
+        ? 'สายคาดอก หรือนาฬิกาที่ส่งค่าชีพจรผ่านบลูทูธ'
+        : switch (hr.link) {
+            SensorLink.connected =>
+              '${sensor.name} · ${bpm == null ? 'เชื่อมต่อแล้ว' : '$bpm bpm'}',
+            SensorLink.connecting => '${sensor.name} · กำลังเชื่อมต่อ…',
+            SensorLink.noHeartRate => '${sensor.name} · ไม่พบค่าชีพจร',
+            SensorLink.disconnected => '${sensor.name} · ไม่ได้เชื่อมต่อ',
+          };
+    return _SettingRow(
+      icon: hr.connected
+          ? Icons.monitor_heart_rounded
+          : Icons.monitor_heart_outlined,
+      title: 'เซนเซอร์ชีพจร / นาฬิกา',
+      subtitle: subtitle,
+      trailing: TextButton(
+        onPressed: () => HeartRateSensorSheet.show(context),
+        child: Text(sensor == null ? 'เชื่อมต่อ' : 'จัดการ'),
+      ),
+    );
+  }
 }
 
 class _SettingRow extends StatelessWidget {

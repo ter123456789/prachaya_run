@@ -137,7 +137,7 @@ Rules (enforced for every feature by `test/architecture_test.dart`):
   CountUpText, ProgressRing, PillTabs (sliding lime thumb), AppChip, StatusPill/PulseDot, AppTopBar,
   AvatarButton, SectionHeader, FloatingDock + OrbButton, Shimmer, EdgeFade, FadeSlideIn, FadeIndexedStack.
   `features/activity/presentation/widgets/route_canvas.dart` draws the self-animating luminescent route.
-- Not in the app on purpose: notification bell, place names. Profile 08 hides resting HR, VO2 Max, fitness age, sensors,
+- Not in the app on purpose: notification bell, place names. Profile 08 hides resting HR, VO2 Max, fitness age,
   Strava/Apple Health and route privacy; schedule 09 hides multi-week plan names and best-time
   windows — no data source. Never show the design's sample values.
 - HR zones: Max HR = user value, else Tanaka `208 − 0.7 × age` (birth year typed in พ.ศ. or ค.ศ.);
@@ -169,7 +169,8 @@ Rules (enforced for every feature by `test/architecture_test.dart`):
     named device (heart-rate ones first): some wristbands only show 0x180D after connecting.
   - **Recording:** `RecordBloc` reads the same monitor; `RecordingSession.addHeartRate` keeps one sample per
     second, none while paused (a vehicle rewind drops them too). Stamped with the recording clock.
-  - **UI:** record page heart pill → `HeartRateSensorSheet`; with a sensor the "ขึ้นสะสม" tile becomes
+  - **UI:** record page heart pill, or ProfilePage → การตั้งค่า → "เซนเซอร์ชีพจร / นาฬิกา", →
+    `HeartRateSensorSheet`; with a sensor the "ขึ้นสะสม" tile becomes
     "ชีพจร" (zone from `ProfileCubit` Max HR). Detail `HeartRateCard`: avg / max, curve, time in zone
     (`summarizeHeartRate`: each sample counts ≤ 5 s). Without heart rate the detail shows calories only.
   - **Debug:** `SimulatedHeartRateMonitor` lists "เซนเซอร์จำลอง (debug)" in every scan (simulators have no

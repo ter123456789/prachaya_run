@@ -80,4 +80,41 @@ void main() {
       findsOneWidget,
     );
   });
+
+  testWidgets('the profile settings open the same sensor sheet', (
+    tester,
+  ) async {
+    final app = TestApp();
+    await app.pump(tester);
+    await tester.tap(find.byTooltip('บัญชี').first);
+    await tester.pumpAndSettle();
+    final row = find.text('เซนเซอร์ชีพจร / นาฬิกา');
+    await tester.scrollUntilVisible(
+      row,
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(TextButton, 'เชื่อมต่อ'));
+    await tester.pumpAndSettle();
+    expect(find.text('อุปกรณ์ใกล้เคียง'), findsOneWidget);
+
+    app.heartRate.scanning!.add(const [
+      HeartRateSensor(
+        id: 'g',
+        name: 'Forerunner 265',
+        advertisesHeartRate: true,
+      ),
+    ]);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Forerunner 265'));
+    await tester.pumpAndSettle();
+    app.heartRate
+      ..emitStatus(SensorLink.connected)
+      ..emitReading(66);
+    await tester.tap(find.byTooltip('ปิด'));
+    await tester.pumpAndSettle();
+    expect(find.text('Forerunner 265 · 66 bpm'), findsOneWidget);
+    expect(find.widgetWithText(TextButton, 'จัดการ'), findsOneWidget);
+  });
 }
