@@ -17,12 +17,14 @@ class DeviceGuestData implements GuestDataRepository {
     required PhotoLocalDataSource photos,
     required SyncedRecordStore shoes,
     required SyncedRecordStore workouts,
+    required SyncedRecordStore routes,
     required ProfileStore profiles,
     required ActivitySyncEngine sync,
   }) : _activities = activities,
        _photos = photos,
        _shoes = shoes,
        _workouts = workouts,
+       _routes = routes,
        _profiles = profiles,
        _sync = sync;
 
@@ -30,10 +32,11 @@ class DeviceGuestData implements GuestDataRepository {
   final PhotoLocalDataSource _photos;
   final SyncedRecordStore _shoes;
   final SyncedRecordStore _workouts;
+  final SyncedRecordStore _routes;
   final ProfileStore _profiles;
   final ActivitySyncEngine _sync;
 
-  List<SyncedRecordStore> get _records => [_shoes, _workouts];
+  List<SyncedRecordStore> get _records => [_shoes, _workouts, _routes];
 
   @override
   Future<GuestDataSummary> summary() async {
@@ -49,6 +52,7 @@ class DeviceGuestData implements GuestDataRepository {
       bests: PersonalBests.from(tracks),
       shoeCount: (await _shoes.visible(null)).length,
       workoutCount: (await _workouts.visible(null)).length,
+      routeCount: (await _routes.visible(null)).length,
       hasProfile: profile != null && !profile.profile.isEmpty,
     );
   }

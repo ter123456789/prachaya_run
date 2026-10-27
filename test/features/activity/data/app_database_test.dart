@@ -157,4 +157,36 @@ void main() {
     expect(stored.profile.weightKg, 70);
     expect(stored.dirty, isFalse);
   });
+
+  test('v4 → v5 keeps shoes and plans and adds planned routes', () async {
+    final dir = Directory.systemTemp.createTempSync('prachaya_db');
+    addTearDown(() => dir.deleteSync(recursive: true));
+    final path = '${dir.path}/test.db';
+    // A v4 database: open at v5 with the real migrations, then roll the
+    // version back and drop the v5 table, as a v4 install would have it.
+    final v5 = await AppDatabase.open(factory: factory, path: path);
+    await v5.insert(AppDatabase.shoesTable, {
+      'id': 's1',
+      'owner_id': 'u1',
+      'data': '{"name":"Pegasus"}',
+      'updated_at': 1,
+      'synced': 1,
+    });
+    await v5.execute('DROP TABLE ${AppDatabase.routesTable}');
+    await v5.setVersion(4);
+    await v5.close();
+
+    final db = await AppDatabase.open(factory: factory, path: path);
+    addTearDown(db.close);
+    expect(await db.getVersion(), 5);
+    expect((await db.query(AppDatabase.shoesTable)).single['id'], 's1');
+    expect(await db.query(AppDatabase.routesTable), isEmpty);
+    await db.insert(AppDatabase.routesTable, {
+      'id': 'r1',
+      'owner_id': null,
+      'data': '{}',
+      'updated_at': 1,
+    });
+    expect((await db.query(AppDatabase.routesTable)).single['synced'], 0);
+  });
 }

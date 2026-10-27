@@ -13,11 +13,13 @@ class FakeServer {
   final List<http.BaseRequest> requests = [];
   final List<Map<String, Object?>> uploads = [];
 
-  /// v1.2 records by resource (`shoes`, `workouts`): id → API object plus
+  /// v1.2/v1.4 records by resource (`shoes`, `workouts`, `routes`): id → API
+  /// object plus
   /// `_serverUpdatedAt`.
   final Map<String, Map<String, Map<String, Object?>>> records = {
     'shoes': {},
     'workouts': {},
+    'routes': {},
   };
 
   /// photoId → {activityId, takenAt, bytes}
@@ -130,7 +132,15 @@ class FakeServer {
       return _json(200, profile);
     }
 
-    final record = RegExp(r'^/(shoes|workouts)(?:/([^/]+))?$').firstMatch(path);
+    // v1.4: every point is on a road; the route is the shape itself.
+    if (path == '/routes/snap' && request.method == 'POST') {
+      final body = jsonDecode(request.body) as Map<String, Object?>;
+      return _json(200, {'route': body['shape'], 'distanceM': 1000.0});
+    }
+
+    final record = RegExp(
+      r'^/(shoes|workouts|routes)(?:/([^/]+))?$',
+    ).firstMatch(path);
     if (record != null) {
       return _record(request, record.group(1)!, record.group(2));
     }

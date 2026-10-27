@@ -45,6 +45,12 @@ lib/
     domain/                 # GpsSimulation, RouteSimulator (pure route → GPS fixes), DebugTools port
     data/                   # SimulatedLocationTracker, VirtualClock (sped-up time), DebugHttpClient
     presentation/           # DebugOverlay (draggable button), DebugPanel, DebugCubit
+  features/route_builder/   # draw a shape on the map → walkable route (GPS art), docs/backlog/route-draw.md
+    domain/                 # GeoPoint, PlannedRoute, RouteRepository/RouteSnapper ports, route_geometry
+                            #   (RDP, densify, LocalPlane), route_fit (score + detours), SnapDrawing
+    data/                   # HttpRouteSnapper (POST /routes/snap), OfflineFirstRouteRepository,
+                            #   RouteJsonMapper + PolylineCodec (encoded polyline, precision 5)
+    presentation/           # RouteListPage, RouteDrawPage, RouteDrawCubit, RoutesCubit, RoutesTeaser (on 09)
   features/photo_share/     # put route + stats on a photo / transparent sticker
     domain/                 # RouteShape (track → unit-box polyline), PhotoSource + ImageSink ports
     data/                   # image_picker, gal (save to gallery), share_plus
@@ -94,12 +100,19 @@ Rules (enforced for every feature by `test/architecture_test.dart`):
 - DB v4 adds `activities.shoe_id` and the `shoes` / `planned_workouts` tables (id, owner_id,
   data JSON, updated_at, deleted_at, synced — same scoping, LWW and tombstones as activities).
   The profile is in `kv` (`profile:<userId>`, `profile:local` while signed out, `_dirty` flag).
-- Sync order: push → pull → photos → participants (ProfileSync, /shoes, /workouts).
+- Sync order: push → pull → photos → participants (ProfileSync, /shoes, /workouts, /routes).
   503 `storage_unavailable` (server photo storage down) keeps photos queued, still syncs the
   participants, and reports the run as `failed` so it is retried.
   ProfileSync PATCHes every field when dirty (so clearing reaches the server), else GETs `/me`;
   a signed-out profile fills the account's empty fields on first sign-in. Multiple primary shoes
   (two offline devices) resolve to the most recently edited one; unknown shoeIds count as none.
+- DB v5 adds `planned_routes` (same record table as shoes/plans; v1.4 `/routes`, synced after
+  `/workouts`, included in guest merge/keep and account purge).
+- Route snapping (api.md v1.4): `POST /routes/snap` sends the drawing (RDP for hand jitter, then a point
+  every ≥ 35 m) and the server matches it with Valhalla `trace_route` (pedestrian, `map_snap`); unset
+  `VALHALLA_URL` → 503 `provider_not_configured`. Needs an account; signed out or offline the drawing
+  alone can be saved (`route: null`). The app scores the fit itself (`route_fit.dart`: share of the route
+  within 6 % of the shape's size of the drawing, and share of the drawing covered; detours shown amber).
 - DB v3 adds `activity_photos` (offline-first photos, files named by photo id under app docs `photos/`),
   `activities.photo_count/photos_stale`, and a `kv` JSON cache (profile, challenge, weather).
 - DB v2 columns: `updated_at` (last-write-wins), `deleted_at` (tombstone until DELETE succeeds),

@@ -40,6 +40,9 @@ import 'features/reminders/domain/repositories/reminder_settings_repository.dart
 import 'features/reminders/presentation/bloc/reminders_cubit.dart';
 import 'features/reminders/presentation/reminder_coordinator.dart';
 import 'features/reminders/presentation/widgets/reminder_listeners.dart';
+import 'features/route_builder/domain/repositories/route_repository.dart';
+import 'features/route_builder/domain/repositories/route_snapper.dart';
+import 'features/route_builder/presentation/bloc/routes_cubit.dart';
 import 'features/training/domain/repositories/workout_repository.dart';
 import 'features/training/domain/usecases/complete_workout.dart';
 import 'features/training/presentation/bloc/training_cubit.dart';
@@ -54,6 +57,8 @@ class PrachayaRunApp extends StatelessWidget {
     required this.photoRepository,
     required this.shoeRepository,
     required this.workoutRepository,
+    required this.routeRepository,
+    required this.routeSnapper,
     required this.settingsRepository,
     required this.reminderScheduler,
     required this.reminderSettings,
@@ -78,6 +83,8 @@ class PrachayaRunApp extends StatelessWidget {
   final ActivityPhotoRepository photoRepository;
   final ShoeRepository shoeRepository;
   final WorkoutRepository workoutRepository;
+  final RouteRepository routeRepository;
+  final RouteSnapper routeSnapper;
   final SettingsRepository settingsRepository;
   final ReminderScheduler reminderScheduler;
   final ReminderSettingsRepository reminderSettings;
@@ -108,6 +115,8 @@ class PrachayaRunApp extends StatelessWidget {
       providers: [
         RepositoryProvider.value(value: activityRepository),
         RepositoryProvider.value(value: photoRepository),
+        RepositoryProvider.value(value: routeRepository),
+        RepositoryProvider.value(value: routeSnapper),
         RepositoryProvider<GuestDataRepository?>.value(value: guestData),
         RepositoryProvider<WeatherService?>.value(value: weatherService),
         RepositoryProvider.value(value: photoSource),
@@ -155,6 +164,7 @@ class PrachayaRunApp extends StatelessWidget {
             create: (_) =>
                 TrainingCubit(workoutRepository, activityRepository)..load(),
           ),
+          BlocProvider(create: (_) => RoutesCubit(routeRepository)..load()),
           if (debugTools case final tools?)
             BlocProvider(create: (_) => DebugCubit(tools)),
         ],

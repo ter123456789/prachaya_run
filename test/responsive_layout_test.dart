@@ -9,6 +9,10 @@ import 'package:prachaya_run/features/activity/presentation/pages/home_page.dart
 import 'package:prachaya_run/features/athlete/presentation/pages/profile_page.dart';
 import 'package:prachaya_run/features/auth/presentation/pages/account_page.dart';
 import 'package:prachaya_run/features/photo_share/presentation/pages/photo_overlay_page.dart';
+import 'package:prachaya_run/features/route_builder/domain/entities/geo_point.dart';
+import 'package:prachaya_run/features/route_builder/domain/entities/planned_route.dart';
+import 'package:prachaya_run/features/route_builder/presentation/pages/route_draw_page.dart';
+import 'package:prachaya_run/features/route_builder/presentation/pages/route_list_page.dart';
 import 'package:prachaya_run/features/training/presentation/pages/schedule_page.dart';
 
 import 'helpers/fakes.dart';
@@ -45,6 +49,15 @@ void main() {
       final app = TestApp();
       final activity = sampleActivity();
       app.activities.store[activity.id] = activity;
+      const route = PlannedRoute(
+        id: 'r1',
+        name: 'หัวใจรอบสวนลุมพินี วนสองรอบแล้วกลับบ้าน',
+        drawn: [GeoPoint(13.73, 100.54), GeoPoint(13.735, 100.545)],
+        route: [GeoPoint(13.73, 100.54), GeoPoint(13.735, 100.545)],
+        distanceMeters: 7342,
+        score: 87,
+      );
+      app.routes.store[route.id] = route;
       await app.pump(tester);
       tester.view.physicalSize = size * 3;
       tester.view.padding = FakeViewPadding(
@@ -67,6 +80,9 @@ void main() {
         SchedulePage.route(),
         AccountPage.route(),
         PhotoOverlayPage.route(activity),
+        RouteListPage.route(),
+        RouteDrawPage.route(),
+        RouteDrawPage.route(route: route),
       ]) {
         navigator.push(route);
         await tester.pumpAndSettle();

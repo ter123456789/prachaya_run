@@ -1,5 +1,5 @@
 /// Something besides activities that the sync engine pushes and pulls for
-/// the signed-in account (profile, shoes, planned workouts).
+/// the signed-in account (profile, shoes, planned workouts, routes).
 ///
 /// Runs after activities and photos, in the same sync. Throws the
 /// `ApiClient` exceptions; the engine turns them into an outcome.

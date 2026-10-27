@@ -41,6 +41,8 @@ import 'features/photo_share/data/services/device_image_sink.dart';
 import 'features/photo_share/data/services/image_picker_photo_source.dart';
 import 'features/reminders/data/kv_reminder_settings_repository.dart';
 import 'features/reminders/data/local_notification_scheduler.dart';
+import 'features/route_builder/data/repositories/offline_first_route_repository.dart';
+import 'features/route_builder/data/services/http_route_snapper.dart';
 import 'features/training/data/repositories/offline_first_workout_repository.dart';
 
 /// Composition root: the only place that knows concrete implementations.
@@ -64,6 +66,7 @@ Future<void> main() async {
   final profiles = ProfileStore(kv);
   final shoes = SyncedRecordStore(database, AppDatabase.shoesTable);
   final workouts = SyncedRecordStore(database, AppDatabase.workoutsTable);
+  final routes = SyncedRecordStore(database, AppDatabase.routesTable);
   final sync = ActivitySyncEngine(
     local: local,
     remote: ActivityRemoteDataSource(api),
@@ -73,6 +76,7 @@ Future<void> main() async {
       ProfileSync(profiles, api),
       RecordSyncParticipant(shoes, api, path: '/shoes'),
       RecordSyncParticipant(workouts, api, path: '/workouts'),
+      RecordSyncParticipant(routes, api, path: '/routes'),
     ],
   );
   final activities = OfflineFirstActivityRepository(
@@ -102,6 +106,7 @@ Future<void> main() async {
           await photos.pruneOrphans();
           await shoes.purgeOwner(userId);
           await workouts.purgeOwner(userId);
+          await routes.purgeOwner(userId);
           await profiles.remove(userId);
         },
       ),
@@ -120,6 +125,12 @@ Future<void> main() async {
         tokens,
         scheduleSync: sync.schedule,
       ),
+      routeRepository: OfflineFirstRouteRepository(
+        routes,
+        tokens,
+        scheduleSync: sync.schedule,
+      ),
+      routeSnapper: HttpRouteSnapper(api),
       settingsRepository: KvSettingsRepository(kv),
       reminderScheduler: notifications,
       recordingMirror: Platform.isIOS
@@ -134,6 +145,7 @@ Future<void> main() async {
         photos: photos,
         shoes: shoes,
         workouts: workouts,
+        routes: routes,
         profiles: profiles,
         sync: sync,
       ),

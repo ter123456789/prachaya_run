@@ -58,7 +58,7 @@ class RemoteRecord {
 }
 
 /// SQL for one table of offline-first records (`shoes`,
-/// `planned_workouts`), with the same rules as activities: rows are scoped
+/// `planned_workouts`, `planned_routes`), with the same rules as activities: rows are scoped
 /// by `owner_id`, edits are last-write-wins on `updated_at`, deletes keep a
 /// tombstone until the server confirms them.
 class SyncedRecordStore {

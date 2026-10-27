@@ -163,10 +163,11 @@ class GuestLinkSheet extends StatelessWidget {
     );
   }
 
-  /// Shoes, plans and profile also move, shown as a short note.
+  /// Shoes, plans, routes and profile also move, shown as a short note.
   static String _extras(GuestDataSummary s) => [
     if (s.shoeCount > 0) 'รองเท้า ${s.shoeCount}',
     if (s.workoutCount > 0) 'แผน ${s.workoutCount}',
+    if (s.routeCount > 0) 'เส้นทาง ${s.routeCount}',
     if (s.hasProfile) 'โปรไฟล์',
   ].join(' • ');
 }

@@ -22,6 +22,7 @@ import '../../../activity/presentation/pages/record_page.dart';
 import '../../../athlete/presentation/units.dart';
 import '../../../auth/presentation/bloc/auth_cubit.dart';
 import '../../../auth/presentation/widgets/guest_widgets.dart';
+import '../../../route_builder/presentation/widgets/routes_teaser.dart';
 import '../../domain/entities/planned_workout.dart';
 import '../../domain/services/workout_plan.dart';
 import '../bloc/training_cubit.dart';
@@ -85,6 +86,8 @@ class SchedulePage extends StatelessWidget {
                   ],
                   const SizedBox(height: 16),
                   stagger(_WeekProgress(week: state.week)),
+                  const SizedBox(height: 16),
+                  stagger(const RoutesTeaser()),
                   const SizedBox(height: 24),
                   stagger(
                     Row(

@@ -10,6 +10,7 @@ class GuestDataSummary {
     this.bests = const PersonalBests(),
     this.shoeCount = 0,
     this.workoutCount = 0,
+    this.routeCount = 0,
     this.hasProfile = false,
   });
 
@@ -23,13 +24,18 @@ class GuestDataSummary {
   final PersonalBests bests;
   final int shoeCount;
   final int workoutCount;
+  final int routeCount;
 
   /// Body data typed in while signed out.
   final bool hasProfile;
 
   /// Nothing to merge: sign-in skips the 07.1 question.
   bool get isEmpty =>
-      activityCount == 0 && shoeCount == 0 && workoutCount == 0 && !hasProfile;
+      activityCount == 0 &&
+      shoeCount == 0 &&
+      workoutCount == 0 &&
+      routeCount == 0 &&
+      !hasProfile;
 
   @override
   bool operator ==(Object other) =>
@@ -40,6 +46,7 @@ class GuestDataSummary {
       other.bests == bests &&
       other.shoeCount == shoeCount &&
       other.workoutCount == workoutCount &&
+      other.routeCount == routeCount &&
       other.hasProfile == hasProfile;
 
   @override
@@ -50,6 +57,7 @@ class GuestDataSummary {
     bests,
     shoeCount,
     workoutCount,
+    routeCount,
     hasProfile,
   );
 }

@@ -23,6 +23,9 @@ import 'package:prachaya_run/features/auth/data/sync/profile_store.dart';
 import 'package:prachaya_run/features/auth/data/sync/profile_sync.dart';
 import 'package:prachaya_run/features/auth/domain/entities/guest_data_summary.dart';
 import 'package:prachaya_run/features/auth/domain/entities/user_profile.dart';
+import 'package:prachaya_run/features/route_builder/data/repositories/offline_first_route_repository.dart';
+import 'package:prachaya_run/features/route_builder/domain/entities/geo_point.dart';
+import 'package:prachaya_run/features/route_builder/domain/entities/planned_route.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 import '../../../helpers/fake_server.dart';
@@ -30,6 +33,7 @@ import '../../../helpers/memory_token_store.dart';
 
 const _runId = '3f2b8c1e-9d4a-4b7e-8f21-6c0d5e9a1b23';
 const _shoeId = '0f9a7c3e-1d2b-4c5e-8f60-7a8b9c0d1e2f';
+const _routeId = '5b1e3d7a-2c4f-4a8b-9e6d-1f0a2b3c4d5e';
 
 const _session = StoredSession(
   accessToken: 'access-1',
@@ -69,6 +73,7 @@ void main() {
   late ActivitySyncEngine engine;
   late OfflineFirstActivityRepository activities;
   late OfflineFirstShoeRepository shoes;
+  late OfflineFirstRouteRepository routes;
   late LocalFirstProfileRepository profile;
   late DeviceGuestData guest;
 
@@ -90,6 +95,7 @@ void main() {
     final profiles = ProfileStore(KvStore(db));
     final shoeStore = SyncedRecordStore(db, AppDatabase.shoesTable);
     final workoutStore = SyncedRecordStore(db, AppDatabase.workoutsTable);
+    final routeStore = SyncedRecordStore(db, AppDatabase.routesTable);
     final local = ActivityLocalDataSource(db);
     final photos = PhotoLocalDataSource(db, photoDir);
     engine = ActivitySyncEngine(
@@ -101,6 +107,7 @@ void main() {
         ProfileSync(profiles, api),
         RecordSyncParticipant(shoeStore, api, path: '/shoes'),
         RecordSyncParticipant(workoutStore, api, path: '/workouts'),
+        RecordSyncParticipant(routeStore, api, path: '/routes'),
       ],
     );
     addTearDown(() => engine.sync());
@@ -116,6 +123,11 @@ void main() {
       tokens,
       scheduleSync: schedule,
     );
+    routes = OfflineFirstRouteRepository(
+      routeStore,
+      tokens,
+      scheduleSync: schedule,
+    );
     profile = LocalFirstProfileRepository(
       profiles,
       tokens,
@@ -126,6 +138,7 @@ void main() {
       photos: photos,
       shoes: shoeStore,
       workouts: workoutStore,
+      routes: routeStore,
       profiles: profiles,
       sync: engine,
     );
@@ -134,6 +147,14 @@ void main() {
   Future<void> recordAsGuest() async {
     await activities.save(_run());
     await shoes.save(const Shoe(id: _shoeId, name: 'Pegasus', primary: true));
+    await routes.save(
+      const PlannedRoute(
+        id: _routeId,
+        name: 'หัวใจ',
+        drawn: [GeoPoint(13.73, 100.54), GeoPoint(13.74, 100.55)],
+        distanceMeters: 1500,
+      ),
+    );
     await profile.save(const UserProfile(heightCm: 175));
   }
 
@@ -149,6 +170,7 @@ void main() {
     expect(s.movingTime, const Duration(seconds: 2000));
     expect(s.shoeCount, 1);
     expect(s.workoutCount, 0);
+    expect(s.routeCount, 1);
     expect(s.hasProfile, isTrue);
     // 3 m/s → 5 km in 1666.7 s; no 10 km yet.
     expect(s.bests.fiveK!.inMilliseconds, closeTo(1666667, 2000));
@@ -170,6 +192,7 @@ void main() {
     await engine.sync();
     expect(server.activities, contains(_runId));
     expect(server.live('shoes').single['name'], 'Pegasus');
+    expect(server.live('routes').single['name'], 'หัวใจ');
     expect(server.profile['heightCm'], 175);
 
     tokens.session = null;
@@ -184,10 +207,12 @@ void main() {
 
     expect(await activities.getAll(), isEmpty);
     expect(await shoes.getAll(), isEmpty);
+    expect(await routes.getAll(), isEmpty);
     expect((await profile.load()).heightCm, isNull);
     await engine.sync();
     expect(server.activities, isEmpty);
     expect(server.live('shoes'), isEmpty);
+    expect(server.live('routes'), isEmpty);
     expect(server.profile['heightCm'], isNull);
     expect(await guest.summary(), GuestDataSummary.empty);
 
@@ -195,6 +220,7 @@ void main() {
     await guest.restore();
     expect(await activities.getAll(), hasLength(1));
     expect(await shoes.getAll(), hasLength(1));
+    expect(await routes.getAll(), hasLength(1));
     expect((await profile.load()).heightCm, 175);
     expect((await guest.summary()).activityCount, 1);
   });

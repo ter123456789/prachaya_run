@@ -9,6 +9,8 @@ class TestApp {
   final activities = InMemoryActivityRepository();
   final shoes = InMemoryShoeRepository();
   final workouts = InMemoryWorkoutRepository();
+  final routes = InMemoryRouteRepository();
+  final snapper = FakeRouteSnapper();
   final settings = InMemorySettingsRepository();
   final profile = FakeProfileRepository();
   final auth = FakeAuthRepository();
@@ -34,6 +36,8 @@ class TestApp {
         photoRepository: InMemoryPhotoRepository(),
         shoeRepository: shoes,
         workoutRepository: workouts,
+        routeRepository: routes,
+        routeSnapper: snapper,
         settingsRepository: settings,
         guestData: guest,
         reminderScheduler: reminders,

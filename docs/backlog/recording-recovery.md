@@ -39,7 +39,7 @@
 
 ### 4. วางตามสถาปัตยกรรมเดิม
 - domain: port `RecordingJournal` — `append` / `loadPending` / `clear`
-- data: ตาราง SQLite ใหม่ → **DB v5** (+ migration test บน `sqflite_common_ffi`)
+- data: ตาราง SQLite ใหม่ → **DB v6** (v5 เป็นของ `planned_routes` แล้ว) (+ migration test บน `sqflite_common_ffi`)
 - presentation: `RecordBloc` เรียก journal; หน้าต่างกู้คืนบน dashboard
 - สมุดเป็นของเครื่อง ไม่ผูกบัญชี ตอนบันทึกใช้บัญชีที่ล็อกอินอยู่ตามปกติ (`owner_id` ตามกติกาเดิม)
 

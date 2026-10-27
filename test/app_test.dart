@@ -28,6 +28,8 @@ void main() {
         photoRepository: InMemoryPhotoRepository(),
         shoeRepository: InMemoryShoeRepository(),
         workoutRepository: InMemoryWorkoutRepository(),
+        routeRepository: InMemoryRouteRepository(),
+        routeSnapper: FakeRouteSnapper(),
         settingsRepository: InMemorySettingsRepository(),
         reminderScheduler: FakeReminderScheduler(),
         reminderSettings: InMemoryReminderSettings(),

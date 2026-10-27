@@ -31,6 +31,11 @@ import 'package:prachaya_run/features/reminders/domain/entities/reminder.dart';
 import 'package:prachaya_run/features/reminders/domain/entities/reminder_settings.dart';
 import 'package:prachaya_run/features/reminders/domain/repositories/reminder_scheduler.dart';
 import 'package:prachaya_run/features/reminders/domain/repositories/reminder_settings_repository.dart';
+import 'package:prachaya_run/features/route_builder/domain/entities/geo_point.dart';
+import 'package:prachaya_run/features/route_builder/domain/entities/planned_route.dart';
+import 'package:prachaya_run/features/route_builder/domain/repositories/route_repository.dart';
+import 'package:prachaya_run/features/route_builder/domain/repositories/route_snapper.dart';
+import 'package:prachaya_run/features/route_builder/domain/services/route_geometry.dart';
 
 final t0 = DateTime(2026, 10, 9, 6, 30);
 
@@ -255,6 +260,38 @@ class InMemoryWorkoutRepository implements WorkoutRepository {
 
   @override
   Future<void> delete(String id) async => store.remove(id);
+}
+
+class InMemoryRouteRepository implements RouteRepository {
+  final Map<String, PlannedRoute> store = {};
+
+  @override
+  Future<List<PlannedRoute>> getAll() async =>
+      store.values.toList()..sort((a, b) => a.name.compareTo(b.name));
+
+  @override
+  Future<void> save(PlannedRoute r) async {
+    if (r.name.trim().isEmpty || r.drawn.length < 2) {
+      throw const RouteValidationException();
+    }
+    store[r.id] = r;
+  }
+
+  @override
+  Future<void> delete(String id) async => store.remove(id);
+}
+
+/// Echoes the shape back as the route, or fails with [error].
+class FakeRouteSnapper implements RouteSnapper {
+  RouteSnapError? error;
+  final List<List<GeoPoint>> calls = [];
+
+  @override
+  Future<SnappedPath> snap(List<GeoPoint> shape) async {
+    calls.add(shape);
+    if (error case final e?) throw RouteSnapException(e);
+    return SnappedPath(shape, pathLength(shape));
+  }
 }
 
 class InMemorySettingsRepository implements SettingsRepository {
