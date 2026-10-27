@@ -1,7 +1,8 @@
 package com.example.prachaya_run
 
 import android.app.Activity
-import android.content.Intent
+import android.content.ActivityNotFoundException
+import android.os.Build
 import androidx.health.connect.client.HealthConnectClient
 import androidx.health.connect.client.PermissionController
 import androidx.health.connect.client.aggregate.AggregateMetric
@@ -83,18 +84,8 @@ class HealthBridge(
             return
         }
         when (call.method) {
-            "availability" -> run(result) {
-                val granted = client().permissionController.getGrantedPermissions()
-                if (granted.containsAll(permissions)) "granted" else "denied"
-            }
-            "requestAccess" -> {
-                pendingAccess?.success("denied")
-                pendingAccess = result
-                activity.startActivityForResult(
-                    contract.createIntent(activity, permissions + READ_ROUTES),
-                    REQUEST_CODE,
-                )
-            }
+            "availability" -> run(result) { access() }
+            "requestAccess" -> requestAccess(result)
             "workouts" -> run(result) { workouts(call.from(), call.to()) }
             "detail" -> run(result) {
                 detail(call.argument<String>("id")!!, call.from(), call.to())
@@ -104,11 +95,39 @@ class HealthBridge(
         }
     }
 
-    /** Forwarded from MainActivity.onActivityResult. */
-    fun onPermissionResult(resultCode: Int, data: Intent?) {
-        val granted = contract.parseResult(resultCode, data)
-        pendingAccess?.success(if (granted.containsAll(permissions)) "granted" else "denied")
+    private suspend fun access(): String {
+        val granted = client().permissionController.getGrantedPermissions()
+        return if (granted.containsAll(permissions)) "granted" else "denied"
+    }
+
+    private fun requestAccess(result: MethodChannel.Result) {
+        pendingAccess?.success("denied")
+        pendingAccess = result
+        val wanted = permissions + READ_ROUTES
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                // Android 14+: health permissions are platform runtime
+                // permissions. The contract's intent there only resolves through
+                // registerForActivityResult, which FlutterActivity lacks.
+                activity.requestPermissions(wanted.toTypedArray(), REQUEST_CODE)
+            } else {
+                activity.startActivityForResult(contract.createIntent(activity, wanted), REQUEST_CODE)
+            }
+        } catch (e: ActivityNotFoundException) {
+            pendingAccess = null
+            result.success("unavailable")
+        }
+    }
+
+    /**
+     * Forwarded from MainActivity: onActivityResult before Android 14,
+     * onRequestPermissionsResult from 14. Asks Health Connect what was
+     * granted instead of parsing either result; replies at most once.
+     */
+    fun onPermissionResult() {
+        val result = pendingAccess ?: return
         pendingAccess = null
+        run(result) { access() }
     }
 
     private suspend fun workouts(from: Instant, to: Instant): List<Map<String, Any?>> {

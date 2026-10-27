@@ -32,7 +32,7 @@ class MainActivity : FlutterActivity() {
     @Deprecated("Deprecated in Java")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
-        if (requestCode == HealthBridge.REQUEST_CODE) health?.onPermissionResult(resultCode, data)
+        if (requestCode == HealthBridge.REQUEST_CODE) health?.onPermissionResult()
     }
 
     override fun onRequestPermissionsResult(
@@ -42,5 +42,6 @@ class MainActivity : FlutterActivity() {
     ) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         if (requestCode == HeartRateBridge.REQUEST_CODE) heartRate?.onPermissionsResult()
+        if (requestCode == HealthBridge.REQUEST_CODE) health?.onPermissionResult()
     }
 }
